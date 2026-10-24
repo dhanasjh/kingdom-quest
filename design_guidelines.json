@@ -1,0 +1,212 @@
+{
+  "app_name": "Kingdom Quest: Match & Rebuild",
+  "personality": "4. Tactile / Playful LIGHT + Glossy Liquid Glass (Fusion)",
+  "personality_one_liner": "A vibrant, juicy casual puzzle world featuring chunky 3D buttons and glossy, frosted liquid-glass panels over animated themed backgrounds.",
+  "color": {
+    "surface": "#FDFBF7",
+    "onSurface": "#2C2C2C",
+    "surfaceSecondary": "#FFFFFF",
+    "onSurfaceSecondary": "#3A3A3A",
+    "surfaceTertiary": "#F1EDE4",
+    "onSurfaceTertiary": "#4A4A4A",
+    "surfaceInverse": "#2C2C2C",
+    "onSurfaceInverse": "#FFFFFF",
+    "brand": "#FF7A59",
+    "onBrand": "#FFFFFF",
+    "brandPrimary": "#FF6B6B",
+    "onBrandPrimary": "#FFFFFF",
+    "brandSecondary": "#FFD166",
+    "onBrandSecondary": "#4A4A4A",
+    "brandTertiary": "#06D6A0",
+    "onBrandTertiary": "#1B4332",
+    "success": "#06D6A0",
+    "onSuccess": "#FFFFFF",
+    "warning": "#FFD166",
+    "onWarning": "#4A4A4A",
+    "error": "#EF476F",
+    "onError": "#FFFFFF",
+    "info": "#FFD166",
+    "onInfo": "#4A4A4A",
+    "border": "#E5E5E5",
+    "borderStrong": "#CCCCCC",
+    "divider": "#EEEEEE",
+    "muted": "#9E9E9E"
+  },
+  "typography": {
+    "displayFontFamily": "Fredoka",
+    "textFontFamily": "Nunito",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Use generous tactile spacing. Elements should feel touchable and chunky, with clear layering between the background art, the glossy panels, and the foreground interactive buttons.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "pill": 999
+  },
+  "shadow_tier": 2,
+  "navigation": "stack_only",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Use 'liquid glass' for all modal panels, level objective HUDs, and the main game board background layer.",
+      "Apply expo-blur with medium intensity (15-25), accompanied by a translucent white tint (rgba(255,255,255,0.4)) and a 1.5pt bright white inner border to simulate thick liquid glass.",
+      "Place liquid glass panels exclusively over animated/colored chapter backgrounds to ensure the blur refracts correctly."
+    ],
+    "dont's": [
+      "Do not use glass on interactive game pieces or chunky 3D buttons (they need solid color contrast).",
+      "Do not stack more than two glass layers."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary with 90% opacity"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "ChapterSelect",
+      "purpose": "A scrollable carousel or grid of the 16 themed chapter cards showing progression.",
+      "states": {
+        "loading": "Chunky spinner with 'Loading Kingdoms...' text.",
+        "empty": "N/A",
+        "error": "Failed to load chapters. Retry button."
+      },
+      "layout": "Horizontal snap-carousel using React Native Reanimated. Each card is a liquid glass panel displaying the chapter's name, a thumbnail of the themed background art, and a chunky 'Play' button for unlocked chapters or a lock icon for locked ones. Floating sparkles in the background."
+    },
+    {
+      "name": "LevelMap",
+      "purpose": "A vertical, zigzag scrolling map of 125 levels layered over the animated chapter background.",
+      "states": {
+        "loading": "Level map loading skeleton.",
+        "empty": "N/A",
+        "error": "Failed to load level progress."
+      },
+      "layout": "Virtualized scroll view with a persistent, slowly panning animated background. The path connects level nodes. Active levels are large chunky 3D buttons (bouncing animation), locked levels are dimmed/greyed out, and cleared levels show 1-3 stars. The top HUD is a liquid glass header showing Lives, Coins, and Settings."
+    },
+    {
+      "name": "GameBoard",
+      "purpose": "The core 8x8 match-3 gameplay screen.",
+      "states": {
+        "loading": "Board generation loading.",
+        "empty": "N/A",
+        "error": "Level load error."
+      },
+      "layout": "Background: chapter-specific animated parallax background. Top HUD: liquid glass panel containing moves left, objectives, and score. Middle: The 8x8 grid sits on a large, rounded liquid glass panel. Game pieces are vivid, fully opaque AI-generated character icons. Bottom HUD: liquid glass shelf holding booster tools (hammer, shuffle) as chunky 3D buttons."
+    },
+    {
+      "name": "ResultsModal",
+      "purpose": "Shows level win/loss state, score, and stars earned.",
+      "states": {
+        "loading": "Calculating score...",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Full-screen dim overlay with a central, oversized liquid glass modal. Contains massive Fredoka typography for 'Level Cleared!', 3 animated star slots, score counter, and two chunky buttons ('Next Level' and 'Home')."
+    },
+    {
+      "name": "KingdomRebuild",
+      "purpose": "Meta-game screen where players spend stars to rebuild 5 areas.",
+      "states": {
+        "loading": "Loading kingdom state.",
+        "empty": "N/A",
+        "error": "Error loading tasks."
+      },
+      "layout": "Shows an isometric or flat art background of the kingdom. A liquid glass bottom sheet lists pending tasks (e.g., 'Fix the fountain - 2 stars'). Tapping a task triggers a 3D chunky button and a completion animation over the background."
+    }
+  ],
+  "game_specifics": {
+    "liquid_glass_panel_spec": {
+      "blur_intensity": 20,
+      "tint": "rgba(255, 255, 255, 0.4)",
+      "border": "1.5px solid rgba(255, 255, 255, 0.7)",
+      "border_radius": 24,
+      "shadow": "0px 8px 16px rgba(0, 0, 0, 0.1)"
+    },
+    "chunky_3d_button_spec": {
+      "base_color": "brandPrimary (or brandSecondary/brandTertiary based on action)",
+      "border_radius": 16,
+      "border_bottom": "6px solid rgba(0, 0, 0, 0.2) (creates 3D extrusion)",
+      "inner_highlight": "inset 0px 4px 0px rgba(255, 255, 255, 0.3) (top reflection)",
+      "press_behavior": "translateY(6px) and reduce border_bottom to 0px on press"
+    },
+    "piece_tile_spec": {
+      "description": "8x8 grid cells. Each piece is an opaque, saturated AI character icon.",
+      "characters": [
+        "Cheeky Boy (Red)",
+        "Strong Village Kid (Orange)",
+        "Cat (Yellow)",
+        "Mouse (Green)",
+        "Princess (Pink/Coral)",
+        "Dragon (Charcoal/Dark)"
+      ],
+      "specials": ["Rocket (Line Clear)", "Bomb (Radius Clear)", "Rainbow (Color Clear)"],
+      "obstacles": ["Ice (Requires 1 match adjacent)", "Crate (Requires 2 matches)", "Vine (Locks piece)", "Lock (Requires key)"]
+    },
+    "animated_background_spec": {
+      "technique": "react-native-reanimated for continuous slow translation (parallax) of a large background image.",
+      "particles": "Floating SVGs (sparkles, leaves, or embers depending on chapter theme) drifting upwards using Reanimated with random delays."
+    },
+    "chapter_themes": [
+      { "id": 1, "name": "Enchanted Forest", "accent": "#06D6A0", "prompt": "Magical sunlit forest, glowing mushrooms, giant trees, casual game art style" },
+      { "id": 2, "name": "Desert Ruins", "accent": "#FFD166", "prompt": "Sandy dunes, ancient sandstone temples, bright oasis, casual game art style" },
+      { "id": 3, "name": "Candy Kingdom", "accent": "#FF6B6B", "prompt": "Lollipop trees, chocolate rivers, gummy hills, vibrant candy game art style" },
+      { "id": 4, "name": "Crystal Caverns", "accent": "#06D6A0", "prompt": "Glowing emerald and ruby crystals, dark rock walls, sparkling casual game background" },
+      { "id": 5, "name": "Volcano Peak", "accent": "#EF476F", "prompt": "Bubbling lava rivers, obsidian rocks, warm embers, fiery casual game art" },
+      { "id": 6, "name": "Floating Islands", "accent": "#06D6A0", "prompt": "Islands in the sky, fluffy clouds, windmills, bright sunny game background" },
+      { "id": 7, "name": "Clockwork City", "accent": "#FFD166", "prompt": "Bronze gears, steam pipes, mechanical platforms, steampunk casual game art" },
+      { "id": 8, "name": "Mushroom Valley", "accent": "#FF6B6B", "prompt": "Giant colorful bouncy mushrooms, fairy lights, magical valley game art" },
+      { "id": 9, "name": "Sunken Shipwreck", "accent": "#06D6A0", "prompt": "Underwater coral reefs, sunken treasure galleon, bubbles, bright casual game art" },
+      { "id": 10, "name": "Snowy Tundra", "accent": "#FFFFFF", "prompt": "Ice castles, snow-covered pine trees, frozen lakes, winter game background" },
+      { "id": 11, "name": "Jungle Temple", "accent": "#06D6A0", "prompt": "Dense green jungle, ruined stone temples, vines, tropical casual game art" },
+      { "id": 12, "name": "Haunted Manor", "accent": "#4A4A4A", "prompt": "Spooky but cute graveyard, glowing pumpkins, crooked gates, casual game art" },
+      { "id": 13, "name": "Dragon's Lair", "accent": "#EF476F", "prompt": "Gold coin piles, dragon scales, glowing red eyes, treasure cave game art" },
+      { "id": 14, "name": "Starry Observatory", "accent": "#FFD166", "prompt": "Telescopes, glowing constellations, deep night sky, magical casual game art" },
+      { "id": 15, "name": "Rainbow Road", "accent": "#FF6B6B", "prompt": "Colorful glowing paths in space, bright stars, vibrant rainbow casual game art" },
+      { "id": 16, "name": "Royal Castle", "accent": "#FFD166", "prompt": "Golden banners, white marble towers, red carpets, victory castle game art" }
+    ]
+  },
+  "images": {
+    "character_dragon": {
+      "url": "https://images.unsplash.com/photo-1610308700652-d931026f7eec?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwxfHxjYXJ0b29uJTIwZHJhZ29uJTIwY2hhcmFjdGVyJTIwaWxsdXN0cmF0aW9ufGVufDB8fHx8MTc5MjMwOTUwM3ww&ixlib=rb-4.1.0&q=85",
+      "alt": "Cartoon dragon placeholder"
+    },
+    "chapter_candy_bg": {
+      "url": "https://images.unsplash.com/photo-1752614736972-925f4c90fc04?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzR8MHwxfHNlYXJjaHwxfHxjYW5keSUyMGxhbmQlMjBnYW1lJTIwYmFja2dyb3VuZCUyMGlsbHVzdHJhdGlvbnxlbnwwfHx8fDE3OTIzMDk1MDN8MA&ixlib=rb-4.1.0&q=85",
+      "alt": "Candy land background placeholder"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Build a mobile-first casual game UI. Do not use web-centric patterns.",
+    "Implement the 'Liquid Glass' aesthetic heavily: use `expo-blur` or `expo-glass-effect` for containers/panels over moving backgrounds. These panels must have a thick white translucent tint and a bright 1.5pt white border to simulate glass thickness.",
+    "Implement 'Chunky 3D Buttons' for primary interactions. Use standard React Native `<Pressable>` with Reanimated. Default state has a thick bottom border (simulating 3D extrusion) and an inner top highlight. On press, translate the Y-axis down and remove the bottom border to simulate physical pressing.",
+    "Ensure all backgrounds have subtle continuous parallax/floating animations using `react-native-reanimated`.",
+    "The 16 chapter themes are defined in `game_specifics.chapter_themes`.",
+    "Use Fredoka for all headings, scores, and large buttons. Use Nunito for readable body text/instructions.",
+    "Ensure the match-3 board uses absolute positioning/Reanimated for smooth piece swapping and falling animations. Implement the 8x8 grid with the specified character pieces.",
+    "BANNED: Do not use any blue, indigo, purple, or magenta in the UI or assets. Use the specified warm coral, mint, and yellow palette."
+  ]
+}
