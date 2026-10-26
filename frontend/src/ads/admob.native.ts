@@ -9,7 +9,7 @@ const TEST_UNIT = Platform.select({
 });
 const REAL_UNIT = Platform.select({
   ios: process.env.EXPO_PUBLIC_ADMOB_IOS_REWARDED_ID || undefined,
-  default: process.env.EXPO_PUBLIC_ADMOB_ANDROID_REWARDED_ID || undefined,
+  default: process.env.EXPO_PUBLIC_ADMOB_ANDROID_REWARDED_ID || "ca-app-pub-9761067758707256/1063963280",
 });
 const REWARDED_UNIT_ID = __DEV__ ? TEST_UNIT : REAL_UNIT;
 

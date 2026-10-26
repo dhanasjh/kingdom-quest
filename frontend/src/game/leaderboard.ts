@@ -1,5 +1,5 @@
 export type WeeklyEntry = { display_name: string; stars: number };
-const API = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, "");
+const API = (process.env.EXPO_PUBLIC_API_URL || "https://kingdom-quest-433z.onrender.com").replace(/\/$/, "");
 
 export async function submitWeeklyScore(playerId: string, displayName: string, stars: number, week: string) {
   if (!API) return false;

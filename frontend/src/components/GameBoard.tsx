@@ -25,8 +25,7 @@ export function GameBoard({ board, cell, dying, spawnFrom, selected, hint, roste
   const { colors } = useTheme();
   const width = cell * SIZE;
   const gesture = useMemo(() => {
-    let start: Pos | null = null;
-    let fired = false;
+    const state: { start: Pos | null; fired: boolean } = { start: null, fired: false };
     const toCell = (x: number, y: number): Pos => ({
       r: Math.max(0, Math.min(SIZE - 1, Math.floor(y / cell))),
       c: Math.max(0, Math.min(SIZE - 1, Math.floor(x / cell))),
@@ -35,16 +34,16 @@ export function GameBoard({ board, cell, dying, spawnFrom, selected, hint, roste
       .runOnJS(true)
       .minDistance(6)
       .onStart((e) => {
-        start = toCell(e.x - e.translationX, e.y - e.translationY);
-        fired = false;
+        state.start = toCell(e.x - e.translationX, e.y - e.translationY);
+        state.fired = false;
       })
       .onUpdate((e) => {
-        if (fired || !start) return;
+        if (state.fired || !state.start) return;
         const { translationX: dx, translationY: dy } = e;
         const th = cell * 0.35;
         if (Math.abs(dx) < th && Math.abs(dy) < th) return;
-        fired = true;
-        const s = start;
+        state.fired = true;
+        const s = state.start;
         const to = Math.abs(dx) > Math.abs(dy) ? { r: s.r, c: s.c + Math.sign(dx) } : { r: s.r + Math.sign(dy), c: s.c };
         onSwipe(s, to);
       });

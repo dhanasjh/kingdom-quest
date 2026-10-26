@@ -50,6 +50,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cf38971c-acd7-4ec7-978b-2139b6d9a015"
+      }
+    },
+    "owner": "kannizco"
   }
 }

@@ -51,7 +51,11 @@ async def submit_weekly_score(entry: LeaderboardEntry):
     if not name:
         raise HTTPException(status_code=422, detail="Display name is required")
     doc = {"player_id": entry.player_id, "display_name": name, "stars": entry.stars, "week": entry.week, "updated_at": now}
-    await db.weekly_leaderboard.update_one({"player_id": entry.player_id, "week": entry.week}, {"$set": doc}, upsert=True)
+    try:
+        await db.weekly_leaderboard.update_one({"player_id": entry.player_id, "week": entry.week}, {"$set": doc}, upsert=True)
+    except Exception as exc:
+        logger.exception("Weekly leaderboard write failed")
+        raise HTTPException(status_code=503, detail="Leaderboard database is unavailable") from exc
     return {"ok": True}
 
 @api_router.get("/leaderboard/weekly")
@@ -60,7 +64,11 @@ async def get_weekly_scores():
     week = f"{iso.year}-W{iso.week:02d}"
     if db is None:
         raise HTTPException(status_code=503, detail="Leaderboard storage is not configured")
-    rows = await db.weekly_leaderboard.find({"week": week}, {"_id": 0, "player_id": 0, "week": 0}).sort([("stars", -1), ("display_name", 1)]).limit(100).to_list(100)
+    try:
+        rows = await db.weekly_leaderboard.find({"week": week}, {"_id": 0, "player_id": 0, "week": 0}).sort([("stars", -1), ("display_name", 1)]).limit(100).to_list(100)
+    except Exception as exc:
+        logger.exception("Weekly leaderboard read failed")
+        raise HTTPException(status_code=503, detail="Leaderboard database is unavailable") from exc
     return {"week": week, "entries": rows}
 
 @api_router.get("/leaderboard/weekly/{player_id}")
@@ -69,7 +77,11 @@ async def get_player_weekly_score(player_id: str):
         raise HTTPException(status_code=503, detail="Leaderboard storage is not configured")
     iso = datetime.now(timezone.utc).isocalendar()
     week = f"{iso.year}-W{iso.week:02d}"
-    row = await db.weekly_leaderboard.find_one({"player_id": player_id, "week": week}, {"_id": 0, "player_id": 0})
+    try:
+        row = await db.weekly_leaderboard.find_one({"player_id": player_id, "week": week}, {"_id": 0, "player_id": 0})
+    except Exception as exc:
+        logger.exception("Player leaderboard read failed")
+        raise HTTPException(status_code=503, detail="Leaderboard database is unavailable") from exc
     return {"week": week, "entry": row}
 
 
