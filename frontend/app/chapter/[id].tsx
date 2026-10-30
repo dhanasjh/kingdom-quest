@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useState } from "react";
+import React, { memo, useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,7 +14,7 @@ import { GlassPanel } from "@/src/components/GlassPanel";
 import { LevelStartSheet } from "@/src/components/LevelStartSheet";
 import { StarRow } from "@/src/components/StarRow";
 import { CHAPTERS, LEVELS_PER_CHAPTER, LevelDef, chapterFirstLevel, getLevel, levelInChapter } from "@/src/game/levels";
-import { formatMs, useProgress } from "@/src/game/progress";
+import { formatMs, MAX_LIVES, useProgress } from "@/src/game/progress";
 import { fonts, lifted, makeStyles, spacing, useTheme } from "@/src/theme";
 
 const ROW = 112;
@@ -66,6 +66,7 @@ export default function ChapterMapScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const prog = useProgress();
+  const lifeAdLock = useRef(false);
   const showAd = useRewardedAd();
   const [picked, setPicked] = useState<LevelDef | null>(null);
 
@@ -129,7 +130,7 @@ export default function ChapterMapScreen() {
 
       <GlassPanel style={[styles.header, { paddingTop: insets.top + spacing.sm }]} testID="chapter-header">
         <View style={styles.headRow}>
-          <ChunkyButton testID="chapter-back-button" icon="chevron-left" variant="plain" onPress={() => router.back()} />
+          <ChunkyButton testID="chapter-back-button" icon="chevron-left" variant="plain" onPress={() => router.replace("/")} />
           <View style={{ flex: 1 }}>
             <Text style={styles.kicker}>Chapter {chId}</Text>
             <Text style={styles.title} numberOfLines={1} testID="chapter-title">{ch.name}</Text>
@@ -154,8 +155,17 @@ export default function ChapterMapScreen() {
           router.push(`/level/${lid}`);
         }}
         onAdLife={async () => {
+          if (lifeAdLock.current || !prog.adLifeReady || prog.lives >= MAX_LIVES) return;
+          lifeAdLock.current = true;
           setPicked(null);
-          if (await showAd("free-life")) prog.grant({ lives: 1 });
+          try {
+            if (await showAd("free-life")) {
+              prog.markAdReward("life");
+              prog.grant({ lives: 1 });
+            }
+          } finally {
+            lifeAdLock.current = false;
+          }
         }}
       />
     </View>

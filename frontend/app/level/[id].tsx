@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, BackHandler, Modal, Platform, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
@@ -23,6 +23,8 @@ import { StarterOffer } from "@/src/components/StarterOffer";
 import { useProgress } from "@/src/game/progress";
 import { CHARACTER_NAMES, DEFAULT_ROSTER, heroUnlockLevel } from "@/src/game/art";
 import { comboSfx, playSfx } from "@/src/game/sound";
+import { diwaliEventActive, festivalMatch, festivalPack } from "@/src/game/festivals";
+import type { FestivalEffectType } from "@/src/game/festivals";
 import { fonts, lifted, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
 type Phase = "loading" | "ready" | "resolving" | "won" | "lost";
@@ -30,6 +32,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const EXTRA_MOVES = 5;
 const EXTRA_MOVES_COST = 150;
 const HINT_DELAY = 5000;
+const createCheer = (color: number, event?: FestivalEffectType, emoji?: string, label?: string): Cheer => ({ color, tick: Date.now(), text: label ?? CHEERS[Math.floor(Math.random() * CHEERS.length)], event, emoji });
 
 function remainingFor(o: Objective, s: Stats) {
   const done = o.type === "color" ? s.colors[o.color ?? 0] : o.type === "score" ? s.score : s[o.type];
@@ -41,10 +44,12 @@ export default function LevelScreen() {
   const level = getLevel(Number(id));
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const styles = useStyles();
   const { colors } = useTheme();
   const prog = useProgress();
+  const diwaliActive = diwaliEventActive();
+  const festival = festivalPack(prog.activeFestival) ?? (diwaliActive ? festivalPack("diwali") : undefined);
 
   const [board, setBoard] = useState<Board | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
@@ -57,6 +62,7 @@ export default function LevelScreen() {
   const [quitOpen, setQuitOpen] = useState(false);
   const [banner, setBanner] = useState<string | null>(null);
   const [cheer, setCheer] = useState<Cheer | null>(null);
+  const [festivalEffects, setFestivalEffects] = useState<Partial<Record<number, FestivalEffectType>>>({});
   const [starterOpen, setStarterOpen] = useState(false);
   useEffect(() => {
     if (!cheer) return;
@@ -66,6 +72,7 @@ export default function LevelScreen() {
   const [hint, setHint] = useState<Pos[] | null>(null);
   const [armed, setArmed] = useState<BoosterKind | null>(null);
   const [shop, setShop] = useState<BoosterKind | null>(null);
+  const [boosterAdBusy, setBoosterAdBusy] = useState(false);
   const [extraUsed, setExtraUsed] = useState(false);
   const [adBusy, setAdBusy] = useState(false);
   const [heroUsed, setHeroUsed] = useState(false);
@@ -77,8 +84,15 @@ export default function LevelScreen() {
   const movesRef = useRef(0);
   const statsRef = useRef<Stats>(emptyStats());
   const alive = useRef(true);
+  const boosterAdLock = useRef(false);
 
-  const cell = Math.floor(Math.min(width - spacing.lg * 2, 440, height - insets.top - insets.bottom - 350) / 8);
+  // Keep the grid compact and square: stretching row pitch on tall phones made
+  // characters look vertically disconnected from their matching row.
+  const boardGridWidth = Math.max(160, Math.min(width - spacing.sm * 1 - 20, 436));
+  const cell = Math.max(20, Math.floor(boardGridWidth / 8));
+  // React Native dimensions use dp rather than em. 1.6dp approximates 0.1em
+  // at a 16px base size and leaves a subtle gap between character rows.
+  const cellHeight = cell + 1.6;
 
   const setPhaseBoth = (p: Phase) => { phaseRef.current = p; setPhase(p); };
   const commitBoard = (b: Board) => { boardRef.current = b; setBoard(b); };
@@ -88,6 +102,7 @@ export default function LevelScreen() {
     setPhaseBoth("loading");
     setSelected(null);
     setDying(new Set());
+    setFestivalEffects({});
     setSpawnFrom({});
     setHint(null);
     setArmed(null);
@@ -161,11 +176,21 @@ export default function LevelScreen() {
       expandSpecials(bd, plan);
       // tally which character is being cleared most (for celebrations)
       const tally: number[] = [0, 0, 0, 0, 0, 0];
+      const matched: number[] = [0, 0, 0, 0, 0, 0];
       for (const k of plan.clear) {
         const pc = bd.pieces[Math.floor(k / 8)][k % 8];
         if (pc && pc.special !== "rainbow" && pc.color >= 0) tally[pc.color]++;
       }
+      for (const k of plan.matchCells) {
+        const pc = bd.pieces[Math.floor(k / 8)][k % 8];
+        if (pc && pc.special !== "rainbow" && pc.color >= 0) matched[pc.color]++;
+      }
       const topColor = tally.indexOf(Math.max(...tally));
+      const celebration = festivalMatch(festival, matched);
+      const matchedFestivalEffects = festival && matched.reduce<Partial<Record<number, FestivalEffectType>>>((acc, n, color) => {
+        if (n >= 3) acc[color] = festival.effects[color];
+        return acc;
+      }, {});
       const s = { ...statsRef.current, colors: [...statsRef.current.colors] };
       const before = s.score;
       const removed = applyClear(bd, plan, s);
@@ -174,19 +199,25 @@ export default function LevelScreen() {
       setStats(s);
       const big = plan.skip.size > 0;
       prog.haptic(big ? "heavy" : chain > 0 ? "medium" : "light");
-      playSfx(big ? "special" : comboSfx(chain));
-      if ((big || chain >= 2 || plan.spawns.length > 0) && !cheered) {
+      if (celebration) playSfx(celebration.sound);
+      else playSfx(big ? "special" : comboSfx(chain, prog.activeSoundPack));
+      if ((big || chain >= 2 || plan.spawns.length > 0 || celebration) && !cheered) {
         cheered = true;
-        setCheer({ color: topColor, tick: Date.now(), text: CHEERS[Math.floor(Math.random() * CHEERS.length)] });
-        setTimeout(() => playSfx("cheer"), 120);
+        if (celebration) setCheer(createCheer(celebration.color, celebration.effect, celebration.emoji, celebration.label));
+        else {
+          setCheer(createCheer(topColor));
+          setTimeout(() => playSfx("cheer"), 120);
+        }
       }
       if (chain >= 2) setBanner(chain >= 4 ? "Spectacular!" : chain >= 3 ? "Amazing!" : "Great!");
       setDying(new Set(removed));
+      setFestivalEffects(matchedFestivalEffects ?? {});
       await sleep(230);
       if (!alive.current) return;
       bd = cloneBoard(bd);
       const sp = applyGravity(bd, level.colors);
       setDying(new Set());
+      setFestivalEffects({});
       setSpawnFrom(sp);
       commitBoard(bd);
       await sleep(360);
@@ -278,6 +309,28 @@ export default function LevelScreen() {
     if (alive.current) setPhaseBoth("ready");
   };
 
+  const runSnake = async () => {
+    if (!level?.hard || !boardRef.current || phaseRef.current !== "ready") return;
+    if (!prog.consumeBooster("snake")) return setShop("snake");
+    setSelected(null);
+    setHint(null);
+    setArmed(null);
+    setPhaseBoth("resolving");
+    setBanner("Royal Snake! Objectives cleared!");
+    playSfx("special");
+    prog.haptic("heavy");
+    const next = { ...statsRef.current, colors: [...statsRef.current.colors] };
+    for (const objective of level.objectives) {
+      if (objective.type === "color") next.colors[objective.color ?? 0] = Math.max(next.colors[objective.color ?? 0] ?? 0, objective.count);
+      else if (objective.type === "score") next.score = Math.max(next.score, objective.count, starThresholds(level)[2]);
+      else next[objective.type] = Math.max(next[objective.type], objective.count);
+    }
+    statsRef.current = next;
+    setStats(next);
+    await sleep(650);
+    if (alive.current) finish(true);
+  };
+
   const useHero = async () => {
     if (!level || !boardRef.current || phaseRef.current !== "ready" || heroUsed) return;
     const unlockedHero = (level.roster ?? DEFAULT_ROSTER).find((hero) => DEFAULT_ROSTER.includes(hero) || prog.unlocked - 1 >= heroUnlockLevel(hero));
@@ -294,6 +347,7 @@ export default function LevelScreen() {
 
   const onBooster = (k: BoosterKind) => {
     if (phaseRef.current !== "ready") return;
+    if (k === "snake") return void runSnake();
     const count = k === "hammer" ? prog.hammers : prog.shuffles;
     if (count <= 0) return setShop(k);
     prog.haptic("light");
@@ -305,16 +359,26 @@ export default function LevelScreen() {
     if (!shop) return;
     if (prog.spendCoins(BOOSTER_INFO[shop].cost)) {
       playSfx("coin");
-      prog.grant(shop === "hammer" ? { hammers: 1 } : { shuffles: 1 });
+      prog.grant(shop === "hammer" ? { hammers: 1 } : shop === "shuffle" ? { shuffles: 1 } : { snakes: 1 });
       setShop(null);
     }
   };
 
   const adBooster = async () => {
     const k = shop;
-    if (!k) return;
+    if (!k || !prog.adBoosterReady || boosterAdLock.current) return;
+    boosterAdLock.current = true;
+    setBoosterAdBusy(true);
     setShop(null);
-    if (await showAd(`booster-${k}`)) prog.grant(k === "hammer" ? { hammers: 1 } : { shuffles: 1 });
+    try {
+      if (await showAd(`booster-${k}`)) {
+        prog.markAdReward("booster");
+        prog.grant(k === "hammer" ? { hammers: 1 } : k === "shuffle" ? { shuffles: 1 } : { snakes: 1 });
+      }
+    } finally {
+      boosterAdLock.current = false;
+      setBoosterAdBusy(false);
+    }
   };
 
   const addExtraMoves = () => {
@@ -350,10 +414,30 @@ export default function LevelScreen() {
     setSelected(canSelect(boardRef.current, p) ? p : null);
   };
 
-  const quit = () => {
+  const quit = useCallback(() => {
     if (level && movesRef.current < level.moves && phaseRef.current !== "won" && phaseRef.current !== "lost") prog.loseLife();
-    router.back();
-  };
+    router.replace("/");
+  }, [level, prog, router]);
+
+  useEffect(() => {
+    // React Navigation's web history owns browser Back. BackHandler is for the
+    // Android hardware button only; registering it on web can produce an
+    // unhandled GO_BACK warning when the level is the root route.
+    if (Platform.OS === "web") return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      // A native Modal handles Back through onRequestClose. This listener keeps
+      // the level route from dispatching an unhandled navigation GO_BACK.
+      if (phaseRef.current === "won" || phaseRef.current === "lost") {
+        router.replace("/");
+      } else if (level && movesRef.current < level.moves) {
+        setQuitOpen(true);
+      } else {
+        quit();
+      }
+      return true;
+    });
+    return () => subscription.remove();
+  }, [level, quit, router]);
 
   if (!level) {
     return (
@@ -372,14 +456,13 @@ export default function LevelScreen() {
   return (
     <View style={styles.root}>
       <ChapterBackground chapter={chId} dim={false} />
-      <View style={[styles.hud, { paddingTop: insets.top + spacing.sm }]}>
+      <View style={[styles.hud, { paddingTop: insets.top + 2 }]}>
         <GlassFill />
         <View style={styles.hudRow}>
-          <ChunkyButton testID="quit-level-button" icon="chevron-left" variant="plain" onPress={() => (movesRef.current < level.moves ? setQuitOpen(true) : quit())} />
+          <ChunkyButton testID="quit-level-button" icon="chevron-left" variant="plain" onPress={() => (movesRef.current < level.moves ? setQuitOpen(true) : quit())} size="sm" />
           <View style={styles.levelBox}>
-            <Text style={styles.kicker} numberOfLines={1}>{CHAPTERS[chId - 1].name}</Text>
+            <Text style={styles.stageLabel} numberOfLines={1} testID="level-stage">{CHAPTERS[chId - 1].name} · Stage {levelInChapter(level.id)}{level.hard ? " · Hard" : ""}</Text>
             <Text style={styles.levelNum} testID="level-number">{level.id}</Text>
-            <Text style={styles.kicker} testID="level-stage">Stage {levelInChapter(level.id)}{level.hard ? " · Hard" : ""}</Text>
           </View>
           <View style={[styles.movesBox, moves <= 5 && { backgroundColor: colors.error }]}>
             <Text style={[styles.kicker, { color: colors.onBrandSecondary }, moves <= 5 && { color: colors.onError }]}>Moves</Text>
@@ -388,41 +471,45 @@ export default function LevelScreen() {
         </View>
         <View style={styles.objRow} testID="objectives-row">
           {level.objectives.map((o, i) => (
-            <ObjectiveChip key={i} obj={o} remaining={remainingFor(o, stats)} roster={level.roster} testID={`objective-remaining-${i}`} />
+            <ObjectiveChip key={i} obj={o} remaining={remainingFor(o, stats)} roster={level.roster} customPhotos={prog.characterPhotos} testID={`objective-remaining-${i}`} />
           ))}
         </View>
         <ScoreBar progress={progress} marks={[thresholds[1] / thresholds[2], 1]} score={stats.score} />
       </View>
 
-      <View style={styles.boardArea}>
-        {phase === "loading" || !board || board.pieces.length === 0 ? (
-          <View style={styles.centered} testID="level-loading">
-            <ActivityIndicator color={colors.brandSecondary} size="large" />
-            <Text style={styles.kicker}>Loading level objectives...</Text>
+      <View style={[styles.boardArea, { paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.xl + spacing.md + spacing.sm }]}>
+        <View style={styles.boardStage}>
+          {phase === "loading" || !board || board.pieces.length === 0 ? (
+            <View style={styles.centered} testID="level-loading">
+              <ActivityIndicator color={colors.brandSecondary} size="large" />
+              <Text style={styles.kicker}>Loading level objectives...</Text>
+            </View>
+          ) : (
+            <View style={[styles.frame, festival && styles.festivalFrame]} testID="board-frame">
+              <GlassFill blur={false} tint="rgba(255,255,255,0.045)" sheenOpacity={0.2} />
+              <GameBoard board={board} cell={cell} cellHeight={cellHeight} dying={dying} spawnFrom={spawnFrom} selected={selected} hint={hint} roster={level.roster} customPhotos={prog.characterPhotos} festivalTiles={festival?.tiles} festivalEffects={festivalEffects} cheer={cheer} onTapCell={onTapCell} onSwipe={runSwap} />
+            </View>
+          )}
+          {banner ? (
+            <View style={[styles.bannerWrap, { pointerEvents: "none" }]}>
+              <Text style={styles.banner} testID="combo-banner">{banner}</Text>
+            </View>
+          ) : null}
+          <View style={[styles.cheerPlacement, { pointerEvents: "none" }]}>
+            <CheerOverlay cheer={cheer} roster={level.roster} customPhotos={prog.characterPhotos} compact />
           </View>
-        ) : (
-          <View style={styles.frame} testID="board-frame">
-            <GameBoard board={board} cell={cell} dying={dying} spawnFrom={spawnFrom} selected={selected} hint={hint} roster={level.roster} cheer={cheer} onTapCell={onTapCell} onSwipe={runSwap} />
-          </View>
-        )}
-        {banner ? (
-          <View pointerEvents="none" style={styles.bannerWrap}>
-            <Text style={styles.banner} testID="combo-banner">{banner}</Text>
-          </View>
-        ) : null}
-        <CheerOverlay cheer={cheer} roster={level.roster} />
-      </View>
-
-      {armed === "hammer" ? (
-        <Text style={styles.armedText} testID="hammer-armed-text">Tap any tile to smash it</Text>
-      ) : null}
-      <View style={[styles.boosterBar, { paddingBottom: insets.bottom + spacing.lg }]}>
+          {armed === "hammer" ? (
+            <Text style={styles.armedText} testID="hammer-armed-text">Tap any tile to smash it</Text>
+          ) : null}
+        </View>
+        <View style={[styles.bottomDock, { pointerEvents: "box-none" }]}>
+        <View style={styles.boosterBar}>
         <Pressable testID="hero-ability-button" disabled={heroUsed || phase !== "ready"} onPress={useHero} style={[styles.booster, { opacity: heroUsed ? 0.45 : 1 }]}>
-          <MaterialDesignIcons name="auto-fix" size={26} color={colors.gold} />
+          <MaterialDesignIcons name="auto-fix" size={24} color={colors.gold} />
           <Text style={styles.heroLabel}>{heroUsed ? "Used" : "Hero"}</Text>
         </Pressable>
-        {(["hammer", "shuffle"] as BoosterKind[]).map((k) => {
-          const count = k === "hammer" ? prog.hammers : prog.shuffles;
+        {(["hammer", "shuffle", ...(level.hard ? ["snake" as const] : [])] as BoosterKind[]).map((k) => {
+          const count = k === "hammer" ? prog.hammers : k === "shuffle" ? prog.shuffles : prog.snakes;
           const active = armed === k;
           return (
             <Pressable
@@ -431,7 +518,7 @@ export default function LevelScreen() {
               onPress={() => onBooster(k)}
               style={[styles.booster, active && { backgroundColor: colors.brandSecondary, borderColor: colors.borderStrong }]}
             >
-              <MaterialDesignIcons name={BOOSTER_INFO[k].icon as any} size={28} color={active ? colors.onBrandSecondary : colors.onSurface} />
+              <MaterialDesignIcons name={BOOSTER_INFO[k].icon as any} size={25} color={active ? colors.onBrandSecondary : colors.onSurface} />
               <View style={[styles.badge, { backgroundColor: count > 0 ? colors.brand : colors.brandSecondary }]}>
                 {count > 0 ? (
                   <Text style={styles.badgeText} testID={`booster-${k}-count`}>{count}</Text>
@@ -447,20 +534,24 @@ export default function LevelScreen() {
         <View style={styles.heroTargetRow}>
           <Text style={styles.heroHint}>Power target</Text>
           <View style={styles.targetControls}>
-            <ChunkyButton testID="hero-target-up" icon="chevron-up" variant="plain" onPress={() => setHeroCenter((p) => ({ ...p, r: Math.max(0, p.r - 1) }))} />
-            <ChunkyButton testID="hero-target-down" icon="chevron-down" variant="plain" onPress={() => setHeroCenter((p) => ({ ...p, r: Math.min(7, p.r + 1) }))} />
-            <ChunkyButton testID="hero-target-left" icon="chevron-left" variant="plain" onPress={() => setHeroCenter((p) => ({ ...p, c: Math.max(0, p.c - 1) }))} />
-            <ChunkyButton testID="hero-target-right" icon="chevron-right" variant="plain" onPress={() => setHeroCenter((p) => ({ ...p, c: Math.min(7, p.c + 1) }))} />
+            <ChunkyButton testID="hero-target-up" icon="chevron-up" variant="plain" onPress={() => setHeroCenter((p) => ({ ...p, r: Math.max(0, p.r - 1) }))} size="xs" />
+            <ChunkyButton testID="hero-target-down" icon="chevron-down" variant="plain" onPress={() => setHeroCenter((p) => ({ ...p, r: Math.min(7, p.r + 1) }))} size="xs" />
+            <ChunkyButton testID="hero-target-left" icon="chevron-left" variant="plain" onPress={() => setHeroCenter((p) => ({ ...p, c: Math.max(0, p.c - 1) }))} size="xs" />
+            <ChunkyButton testID="hero-target-right" icon="chevron-right" variant="plain" onPress={() => setHeroCenter((p) => ({ ...p, c: Math.min(7, p.c + 1) }))} size="xs" />
             <Text style={styles.heroHint}>{heroCenter.r + 1},{heroCenter.c + 1}</Text>
           </View>
         </View>
       ) : null}
+        </View>
+      </View>
 
       <StarterOffer visible={starterOpen} onClose={() => setStarterOpen(false)} />
       <BoosterShop
         kind={shop}
-        count={shop === "hammer" ? prog.hammers : prog.shuffles}
+        count={shop === "hammer" ? prog.hammers : shop === "shuffle" ? prog.shuffles : prog.snakes}
         coins={prog.coins}
+        watchAdAvailable={prog.adBoosterReady}
+        watchAdBusy={boosterAdBusy}
         onBuy={buyBooster}
         onWatchAd={adBooster}
         onClose={() => setShop(null)}
@@ -469,6 +560,7 @@ export default function LevelScreen() {
       <ResultsModal
         visible={(phase === "won" || phase === "lost") && !adBusy && !starterOpen}
         won={phase === "won"}
+        festivalCelebration={phase === "won" ? festival?.celebration : undefined}
         level={level.id}
         stars={result.stars}
         score={result.score}
@@ -489,18 +581,21 @@ export default function LevelScreen() {
         }}
         onMap={() => {
           if (phase === "lost") prog.loseLife();
-          router.back();
+          router.replace("/");
         }}
       />
 
       <Modal visible={quitOpen} transparent animationType="fade" onRequestClose={() => setQuitOpen(false)}>
         <View style={styles.quitBackdrop}>
           <View style={styles.quitCard} testID="quit-confirm-modal">
-            <Text style={styles.title}>Leave level?</Text>
-            <Text style={styles.body}>You will lose a life if you quit now.</Text>
+            <View style={styles.quitEmblem}>
+              <MaterialDesignIcons name="heart-broken" size={34} color={colors.heart} />
+            </View>
+            <Text style={[styles.title, { textAlign: "center" }]}>Pause your adventure?</Text>
+            <Text style={[styles.body, { textAlign: "center" }]}>Leaving now will use one life. Your level progress will not be saved.</Text>
             <View style={styles.hudRow}>
-              <ChunkyButton testID="quit-cancel-button" label="Keep playing" variant="primary" onPress={() => setQuitOpen(false)} />
-              <ChunkyButton testID="quit-confirm-button" label="Quit" variant="secondary" onPress={() => { setQuitOpen(false); quit(); }} />
+              <ChunkyButton testID="quit-cancel-button" label="Keep playing" variant="primary" onPress={() => setQuitOpen(false)} style={{ flex: 1 }} />
+              <ChunkyButton testID="quit-confirm-button" label="Leave" variant="plain" onPress={() => { setQuitOpen(false); quit(); }} style={{ flex: 1 }} />
             </View>
           </View>
         </View>
@@ -534,34 +629,40 @@ function ScoreBar({ progress, marks, score }: { progress: number; marks: number[
 const useStyles = makeStyles((c) => ({
   root: { flex: 1, backgroundColor: c.surfaceInverse },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.md },
-  hud: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.md, overflow: "hidden", borderWidth: 1.5, borderTopWidth: 0, borderColor: c.glassBorder, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
-  hudRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
+  hud: { paddingHorizontal: spacing.md, paddingBottom: 4, gap: 2, overflow: "hidden", borderWidth: 1.5, borderTopWidth: 0, borderColor: c.glassBorder, borderBottomLeftRadius: radius.lg, borderBottomRightRadius: radius.lg },
+  hudRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   levelBox: { alignItems: "center" },
-  kicker: { fontFamily: fonts.textBold, fontSize: 11, color: c.muted, textTransform: "uppercase", letterSpacing: 1 },
-  levelNum: { fontFamily: fonts.display, fontSize: 24, color: c.onSurface },
-  movesBox: { backgroundColor: c.brandSecondary, borderRadius: radius.lg, paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, alignItems: "center", minWidth: 76, ...lifted(c) },
-  moves: { fontFamily: fonts.display, fontSize: 34, lineHeight: 38, color: c.onBrandSecondary },
-  objRow: { flexDirection: "row", gap: spacing.lg, justifyContent: "center", flexWrap: "wrap" },
+  kicker: { fontFamily: fonts.textBold, fontSize: 9, color: c.muted, textTransform: "uppercase", letterSpacing: 0.65 },
+  stageLabel: { fontFamily: fonts.textBold, fontSize: 11, color: "#FFFFFF", textTransform: "uppercase", letterSpacing: 0.45, backgroundColor: "rgba(24,33,48,0.94)", paddingHorizontal: 9, paddingVertical: 4, borderRadius: radius.pill, overflow: "hidden", textShadowColor: "rgba(0,0,0,0.7)", textShadowRadius: 3 },
+  levelNum: { fontFamily: fonts.display, fontSize: 21, lineHeight: 23, color: c.onSurface },
+  movesBox: { backgroundColor: c.brandSecondary, borderRadius: radius.lg, paddingHorizontal: spacing.sm, paddingVertical: 2, alignItems: "center", minWidth: 56, ...lifted(c) },
+  moves: { fontFamily: fonts.display, fontSize: 24, lineHeight: 26, color: c.onBrandSecondary },
+  objRow: { flexDirection: "row", gap: spacing.md, justifyContent: "center", flexWrap: "wrap" },
   scoreWrap: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  scoreTrack: { flex: 1, height: 12, borderRadius: 6, backgroundColor: c.surfaceTertiary, overflow: "hidden" },
+  scoreTrack: { flex: 1, height: 9, borderRadius: 6, backgroundColor: c.surfaceTertiary, overflow: "hidden" },
   scoreFill: { height: "100%", borderRadius: 6 },
   mark: { position: "absolute", top: 0, bottom: 0, width: 2, marginLeft: -2, backgroundColor: c.borderStrong, opacity: 0.4 },
   scoreText: { fontFamily: fonts.display, fontSize: 16, color: c.onSurface, minWidth: 56, textAlign: "right" },
-  boardArea: { flex: 1, alignItems: "center", justifyContent: "center" },
-  frame: { padding: 2 },
-  boosterBar: { flexDirection: "row", justifyContent: "center", gap: spacing.xl, paddingTop: spacing.md },
+  boardArea: { flex: 1, minHeight: 0, alignItems: "center", justifyContent: "flex-start", paddingTop: 0, gap: 0 },
+  boardStage: { flex: 1, minHeight: 0, width: "100%", alignItems: "center", justifyContent: "center", paddingBottom: 4 },
+  frame: { position: "relative", overflow: "hidden", padding: 4, borderRadius: 22, backgroundColor: "rgba(255,255,255,0.12)", borderWidth: 2, borderColor: "rgba(255,255,255,0.82)" },
+  festivalFrame: { borderColor: "rgba(255,209,102,0.92)", backgroundColor: "rgba(255,255,255,0.07)" },
+  bottomDock: { width: "100%", alignItems: "center", justifyContent: "flex-start", gap: 3, paddingTop: 2, marginTop: 0 },
+  boosterBar: { flexDirection: "row", justifyContent: "center", gap: spacing.sm },
   heroLabel: { fontFamily: fonts.textBold, fontSize: 11, color: c.gold },
-  heroTargetRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm, paddingBottom: spacing.xs },
+  heroTargetRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.xs },
   targetControls: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   heroHint: { fontFamily: fonts.textBold, fontSize: 12, color: c.onSurfaceInverse },
-  booster: { width: 66, height: 66, borderRadius: 20, backgroundColor: c.surfaceSecondary, alignItems: "center", justifyContent: "center", borderWidth: 2, borderBottomWidth: 6, borderColor: c.extrude, ...lifted(c) },
-  badge: { position: "absolute", top: -6, right: -6, minWidth: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
+  booster: { width: 54, height: 54, borderRadius: 17, backgroundColor: c.surfaceSecondary, alignItems: "center", justifyContent: "center", borderWidth: 2, borderBottomWidth: 4, borderColor: c.extrude, ...lifted(c) },
+  badge: { position: "absolute", top: -5, right: -5, minWidth: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
   badgeText: { fontFamily: fonts.display, fontSize: 13, color: c.onBrand },
-  armedText: { textAlign: "center", fontFamily: fonts.textBold, fontSize: 14, color: c.onBrandSecondary, backgroundColor: c.brandSecondary, alignSelf: "center", paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, borderRadius: radius.pill, overflow: "hidden" },
-  bannerWrap: { position: "absolute", left: 0, right: 0, alignItems: "center" },
-  banner: { fontFamily: fonts.display, fontSize: 40, color: c.brandSecondary, textShadowColor: c.shadow, textShadowRadius: 6, textShadowOffset: { width: 0, height: 3 } },
+  armedText: { position: "absolute", top: 42, zIndex: 5, textAlign: "center", fontFamily: fonts.textBold, fontSize: 14, color: c.onBrandSecondary, backgroundColor: c.brandSecondary, alignSelf: "center", paddingHorizontal: spacing.lg, paddingVertical: spacing.xs, borderRadius: radius.pill, overflow: "hidden" },
+  bannerWrap: { position: "absolute", top: 8, left: 0, right: 0, zIndex: 4, minHeight: 26, alignItems: "center", justifyContent: "center" },
+  cheerPlacement: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center", zIndex: 3 },
+  banner: { fontFamily: fonts.display, fontSize: 20, color: c.brandSecondary, textShadowColor: c.shadow, textShadowRadius: 6, textShadowOffset: { width: 0, height: 2 } },
   title: { fontFamily: fonts.display, fontSize: 26, color: c.onSurface },
   body: { fontFamily: fonts.text, fontSize: 15, color: c.muted },
   quitBackdrop: { flex: 1, backgroundColor: c.scrim, alignItems: "center", justifyContent: "center", padding: spacing.xl },
   quitCard: { width: "100%", maxWidth: 380, backgroundColor: c.surface, borderRadius: radius.lg, padding: spacing.xl, gap: spacing.lg },
+  quitEmblem: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center", alignSelf: "center", backgroundColor: c.surfaceTertiary, borderWidth: 2, borderColor: c.glassBorder },
 }));

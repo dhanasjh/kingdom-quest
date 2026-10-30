@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import * as Haptics from "expo-haptics";
 
 import { storage } from "@/src/utils/storage";
-import { setMusicEnabled, setSfxEnabled, startMusic } from "@/src/game/sound";
+import { setMusicEnabled, setMusicTrack, setSfxEnabled, startMusic } from "@/src/game/sound";
 import { chapterFirstLevel, chapterOf } from "@/src/game/levels";
 
 export const MAX_LIVES = 5;
@@ -20,34 +20,53 @@ type Saved = {
   haptics: boolean;
   sound: boolean;
   music: boolean;
+  musicTrack: number;
+  customMusicUri: string | null;
+  customMusicName: string;
+  customMusicUnlocked: boolean;
+  unlockedMusicPacks: string[];
+  unlockedSoundPacks: string[];
+  activeSoundPack: string;
   hammers: number;
   shuffles: number;
+  snakes: number;
+  characterPhotos: (string | null)[];
+  unlockedFestivals: string[];
+  activeFestival: string | null;
   lastSpinAt: number;
+  freeSpinDay: string;
+  freeSpinCount: number;
   adSpinDay: string;
+  adLifeDay: string;
+  adCoinsDay: string;
+  adBoosterDay: string;
   unlockAll: boolean;
   purchases: string[];
   starterShown: boolean;
   streak: number;
   lastPlayDay: string;
+  streakRewardDay: string;
   todayWins: number;
   todayDay: string;
   goalClaimedDay: string;
   leaderboardName: string;
+  leaderboardJoined: boolean;
   weeklyStars: Record<string, number>;
   playerId: string;
 };
 
 const initial = (): Saved => ({
   best: {}, unlocked: 1, coins: 0, stars: 0, lives: MAX_LIVES, lifeAt: Date.now(), restored: [], haptics: true,
-  sound: true, music: true, hammers: 3, shuffles: 3, lastSpinAt: 0, adSpinDay: "", unlockAll: false, purchases: [],
-  starterShown: false, streak: 0, lastPlayDay: "", todayWins: 0, todayDay: "", goalClaimedDay: "", leaderboardName: "", weeklyStars: {}, playerId: "",
+  sound: true, music: true, musicTrack: 0, customMusicUri: null, customMusicName: "", customMusicUnlocked: false,
+  unlockedMusicPacks: ["forest", "carnival", "starry"], unlockedSoundPacks: ["classic"], activeSoundPack: "classic",
+  hammers: 3, shuffles: 3, snakes: 0, characterPhotos: [null, null, null, null, null, null], unlockedFestivals: [], activeFestival: null, lastSpinAt: 0, freeSpinDay: "", freeSpinCount: 0, adSpinDay: "", adLifeDay: "", adCoinsDay: "", adBoosterDay: "", unlockAll: false, purchases: [],
+  starterShown: false, streak: 0, lastPlayDay: "", streakRewardDay: "", todayWins: 0, todayDay: "", goalClaimedDay: "", leaderboardName: "", leaderboardJoined: false, weeklyStars: {}, playerId: "",
 });
 
 export const DAILY_GOAL = 3;
 export const DAILY_GOAL_REWARD = 150;
 export const todayKey = () => new Date().toDateString();
 
-export const SPIN_MS = 24 * 60 * 60 * 1000;
 const dayKey = (t: number) => new Date(t).toDateString();
 
 function regen(s: Saved, now: number): Saved {
@@ -58,15 +77,20 @@ function regen(s: Saved, now: number): Saved {
   return { ...s, lives, lifeAt: lives >= MAX_LIVES ? now : s.lifeAt + gained * LIFE_MS };
 }
 
-type Grant = { coins?: number; lives?: number; hammers?: number; shuffles?: number };
+type Grant = { coins?: number; lives?: number; hammers?: number; shuffles?: number; snakes?: number };
 
 type Ctx = Saved & {
   ready: boolean;
   nextLifeIn: number;
   freeSpinReady: boolean;
+  freeSpinsRemaining: number;
   adSpinReady: boolean;
   nextFreeSpinIn: number;
   markSpin: (kind: "free" | "ad") => void;
+  adLifeReady: boolean;
+  adCoinsReady: boolean;
+  adBoosterReady: boolean;
+  markAdReward: (kind: "life" | "coins" | "booster") => void;
   isLevelUnlocked: (id: number) => boolean;
   isChapterUnlocked: (ch: number) => boolean;
   recordPurchase: (productId: string, unlockAll?: boolean) => void;
@@ -77,9 +101,11 @@ type Ctx = Saved & {
   setHapticsOn: (v: boolean) => void;
   setSoundOn: (v: boolean) => void;
   setMusicOn: (v: boolean) => void;
+  setMusicTrackNumber: (v: number) => void;
   grant: (g: Grant) => void;
   spendCoins: (n: number) => boolean;
-  consumeBooster: (k: "hammer" | "shuffle") => boolean;
+  consumeBooster: (k: "hammer" | "shuffle" | "snake") => boolean;
+  claimStreakBonus: () => boolean;
   reset: () => void;
   haptic: (kind: "light" | "medium" | "heavy" | "success" | "error") => void;
 };
@@ -98,10 +124,20 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       const raw = await storage.getItem(KEY, null);
       if (typeof raw === "string") {
         try {
-          setState(regen({ ...initial(), ...JSON.parse(raw) }, Date.now()));
+          const parsed = { ...initial(), ...JSON.parse(raw) } as Saved;
+          // Migrate users from the previous one-free-spin-per-24-hours rule.
+          if (!parsed.freeSpinDay && parsed.lastSpinAt) {
+            parsed.freeSpinDay = dayKey(parsed.lastSpinAt);
+            parsed.freeSpinCount = 1;
+          }
+          setState(regen(parsed, Date.now()));
         } catch {}
       }
-      setState((s) => s.playerId ? s : { ...s, playerId: makePlayerId() });
+      setState((s) => ({
+        ...s,
+        playerId: s.playerId || makePlayerId(),
+        leaderboardName: s.leaderboardName || makePlayerName(),
+      }));
       setReady(true);
     })();
   }, []);
@@ -121,8 +157,9 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setSfxEnabled(state.sound);
     setMusicEnabled(state.music);
+    setMusicTrack(state.musicTrack, state.customMusicUri);
     if (state.music) startMusic();
-  }, [state.sound, state.music]);
+  }, [state.sound, state.music, state.musicTrack, state.customMusicUri]);
 
   const grant = useCallback((g: Grant) => {
     setState((s) => {
@@ -134,6 +171,7 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
         lifeAt: lives >= MAX_LIVES ? Date.now() : s.lifeAt,
         hammers: s.hammers + (g.hammers ?? 0),
         shuffles: s.shuffles + (g.shuffles ?? 0),
+        snakes: s.snakes + (g.snakes ?? 0),
       };
     });
   }, []);
@@ -145,11 +183,21 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, []);
 
-  const consumeBooster = useCallback((k: "hammer" | "shuffle") => {
-    const field = k === "hammer" ? "hammers" : "shuffles";
+  const consumeBooster = useCallback((k: "hammer" | "shuffle" | "snake") => {
+    const field = k === "hammer" ? "hammers" : k === "shuffle" ? "shuffles" : "snakes";
     if (stateRef.current[field] <= 0) return false;
     stateRef.current = { ...stateRef.current, [field]: stateRef.current[field] - 1 };
     setState((s) => ({ ...s, [field]: s[field] - 1 }));
+    return true;
+  }, []);
+
+  const claimStreakBonus = useCallback(() => {
+    const current = stateRef.current;
+    const today = dayKey(Date.now());
+    if (current.streak < 3 || current.lastPlayDay !== today || current.streakRewardDay === today) return false;
+    const next = { ...current, coins: current.coins + 50, streakRewardDay: today };
+    stateRef.current = next;
+    setState(next);
     return true;
   }, []);
 
@@ -207,11 +255,23 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       ...state,
       ready,
       nextLifeIn: state.lives >= MAX_LIVES ? 0 : Math.max(0, state.lifeAt + LIFE_MS - now),
-      freeSpinReady: now - state.lastSpinAt >= SPIN_MS,
-      adSpinReady: now - state.lastSpinAt < SPIN_MS && state.adSpinDay !== dayKey(now),
-      nextFreeSpinIn: Math.max(0, state.lastSpinAt + SPIN_MS - now),
-      markSpin: (kind) =>
-        setState((s) => (kind === "free" ? { ...s, lastSpinAt: Date.now() } : { ...s, adSpinDay: dayKey(Date.now()) })),
+      freeSpinReady: (state.freeSpinDay === dayKey(now) ? state.freeSpinCount : 0) < 2,
+      freeSpinsRemaining: Math.max(0, 2 - (state.freeSpinDay === dayKey(now) ? state.freeSpinCount : 0)),
+      adSpinReady: state.adSpinDay !== dayKey(now),
+      nextFreeSpinIn: (state.freeSpinDay === dayKey(now) ? state.freeSpinCount : 0) < 2 ? 0 : Math.max(0, (() => { const next = new Date(now); next.setHours(24, 0, 0, 0); return next.getTime() - now; })()),
+      adLifeReady: state.adLifeDay !== dayKey(now),
+      adCoinsReady: state.adCoinsDay !== dayKey(now),
+      adBoosterReady: state.adBoosterDay !== dayKey(now),
+      markSpin: (kind) => setState((s) => {
+        const today = dayKey(Date.now());
+        if (kind === "ad") return { ...s, adSpinDay: today };
+        const count = s.freeSpinDay === today ? s.freeSpinCount : 0;
+        return count >= 2 ? s : { ...s, lastSpinAt: Date.now(), freeSpinDay: today, freeSpinCount: count + 1 };
+      }),
+      markAdReward: (kind) => setState((s) => ({
+        ...s,
+        [kind === "life" ? "adLifeDay" : kind === "coins" ? "adCoinsDay" : "adBoosterDay"]: dayKey(Date.now()),
+      })),
       isLevelUnlocked: (id) =>
         id <= state.unlocked || (state.unlockAll && (id === chapterFirstLevel(chapterOf(id)) || (state.best[id - 1] ?? 0) > 0)),
       isChapterUnlocked: (ch) => state.unlockAll || chapterFirstLevel(ch) <= state.unlocked,
@@ -224,13 +284,15 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       setHapticsOn: (v) => setState((s) => ({ ...s, haptics: v })),
       setSoundOn: (v) => setState((s) => ({ ...s, sound: v })),
       setMusicOn: (v) => setState((s) => ({ ...s, music: v })),
+      setMusicTrackNumber: (v) => setState((s) => ({ ...s, musicTrack: Math.max(0, Math.min(4, Math.floor(v))), customMusicUri: null, customMusicName: "" })),
       grant,
       spendCoins,
       consumeBooster,
-      reset: () => setState(initial()),
+      claimStreakBonus,
+      reset: () => setState({ ...initial(), characterPhotos: stateRef.current.characterPhotos }),
       haptic,
     }),
-    [state, ready, now, completeLevel, loseLife, restore, haptic, grant, spendCoins, consumeBooster],
+    [state, ready, now, completeLevel, loseLife, restore, haptic, grant, spendCoins, consumeBooster, claimStreakBonus],
   );
 
   return <ProgressContext.Provider value={value}>{children}</ProgressContext.Provider>;
@@ -249,4 +311,9 @@ export const formatMs = (ms: number) => {
 
 function makePlayerId() {
   return `kq_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 18)}`;
+}
+
+const SAFE_NICKNAMES = ["Brave Lion", "Magic Mouse", "Happy Dragon", "Star Bunny", "Golden Fox", "Kind Panda"];
+function makePlayerName() {
+  return `${SAFE_NICKNAMES[Math.floor(Math.random() * SAFE_NICKNAMES.length)]} ${Math.floor(100 + Math.random() * 900)}`;
 }

@@ -41,7 +41,8 @@ export const CHARACTER_POOL = [
 ];
 
 export const DEFAULT_ROSTER = [0, 3, 6, 9, 12, 15];
-export const artFor = (color: number, roster?: number[]) => CHARACTER_POOL[(roster ?? DEFAULT_ROSTER)[color] ?? 0];
+export const artFor = (color: number, roster?: number[], customPhotos?: (string | null)[]) =>
+  customPhotos?.[color] ? { uri: customPhotos[color] as string } : CHARACTER_POOL[(roster ?? DEFAULT_ROSTER)[color] ?? 0];
 
 export const CHARACTER_NAMES = [
   "Cheeky Chintu", "Ninja Ravi", "Pinky Pigtails", "Mighty Bholu", "Little Monk Tenzin", "Leo the Cub",

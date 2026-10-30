@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Modal, Pressable, Switch, Text, View } from "react-native";
+import { FlatList, LayoutChangeEvent, Modal, Pressable, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
@@ -8,7 +8,8 @@ import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-
 
 import { ChunkyButton } from "@/src/components/ChunkyButton";
 import { useRewardedAd } from "@/src/ads/RewardedAd";
-import { playSfx } from "@/src/game/sound";
+import { MUSIC_TRACKS, playSfx } from "@/src/game/sound";
+import { MUSIC_PACKS } from "@/src/game/musicPacks";
 import { MAX_LIVES, formatMs, useProgress } from "@/src/game/progress";
 import { ChapterBackground } from "@/src/components/ChapterBackground";
 import { GlassPanel } from "@/src/components/GlassPanel";
@@ -17,6 +18,8 @@ import { CHAPTER_BG } from "@/src/game/art";
 import { SpinWheel } from "@/src/components/SpinWheel";
 import { DailyQuest } from "@/src/components/DailyQuest";
 import { CurrencyPill } from "@/src/components/CurrencyPill";
+import { FestivalBanner, MakeItYoursBanner } from "@/src/components/HomeBanners";
+import { AdventureTrail } from "@/src/components/AdventureTrail";
 
 import { CHAPTERS, LEVELS_PER_CHAPTER, LevelDef, TOTAL_LEVELS, chapterOf, getLevel } from "@/src/game/levels";
 import { fonts, lifted, makeStyles, radius, spacing, useTheme } from "@/src/theme";
@@ -33,8 +36,11 @@ export default function MapScreen() {
   const [settings, setSettings] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [livesOpen, setLivesOpen] = useState(false);
+  const [lifeAdBusy, setLifeAdBusy] = useState(false);
+  const [headerHeight, setHeaderHeight] = useState(insets.top + 100);
   const [spinOpen, setSpinOpen] = useState(false);
   const autoSpin = useRef(false);
+  const lifeAdLock = useRef(false);
   useEffect(() => {
     // Offer the daily spin once per app session when it's ready.
     if (!prog.ready || autoSpin.current || !prog.freeSpinReady) return;
@@ -45,9 +51,20 @@ export default function MapScreen() {
   const showAd = useRewardedAd();
 
   const adLife = async () => {
+    if (lifeAdLock.current || !prog.adLifeReady || prog.lives >= MAX_LIVES) return;
+    lifeAdLock.current = true;
+    setLifeAdBusy(true);
     setPicked(null);
     setLivesOpen(false);
-    if (await showAd("free-life")) prog.grant({ lives: 1 });
+    try {
+      if (await showAd("free-life")) {
+        prog.markAdReward("life");
+        prog.grant({ lives: 1 });
+      }
+    } finally {
+      lifeAdLock.current = false;
+      setLifeAdBusy(false);
+    }
   };
 
   const refillLives = () => {
@@ -61,7 +78,7 @@ export default function MapScreen() {
   const currentLevel = Math.min(prog.unlocked, TOTAL_LEVELS);
   const curCh = chapterOf(currentLevel);
   const chapter = CHAPTERS[curCh - 1];
-  const headerH = insets.top + 128;
+  const onHeaderLayout = (event: LayoutChangeEvent) => setHeaderHeight(event.nativeEvent.layout.height);
   const chStats = useMemo(() => {
     const s = CHAPTERS.map(() => ({ stars: 0, cleared: 0 }));
     for (const [k, v] of Object.entries(prog.best)) {
@@ -80,16 +97,33 @@ export default function MapScreen() {
     setPicked(null);
     router.push(`/level/${id}`);
   };
+  const cycleMusic = () => {
+    const available = MUSIC_PACKS.filter((pack) => prog.unlockedMusicPacks.includes(pack.id));
+    if (!available.length) return;
+    const currentIndex = available.findIndex((pack) => pack.track === prog.musicTrack);
+    const next = available[(currentIndex + 1) % available.length];
+    prog.update({ musicTrack: next.track, customMusicUri: null, customMusicName: "" });
+  };
+  const currentMusicName = prog.customMusicUri
+    ? (prog.customMusicName || "Your music")
+    : (MUSIC_TRACKS[prog.musicTrack] ?? MUSIC_TRACKS[0]);
 
   return (
     <View style={styles.root}>
       <ChapterBackground chapter={curCh} />
       <FlatList
         testID="chapter-list"
-        ListHeaderComponent={<DailyQuest />}
+        ListHeaderComponent={(
+          <View style={{ gap: spacing.md }}>
+            <AdventureTrail currentLevel={currentLevel} unlockedLevel={prog.unlocked} onSelect={(id) => setPicked(getLevel(id) ?? null)} />
+            <DailyQuest />
+            <FestivalBanner onPress={() => router.push("/shop")} />
+            <MakeItYoursBanner onPress={() => router.push("/heroes")} />
+          </View>
+        )}
         data={CHAPTERS}
         keyExtractor={(c) => String(c.id)}
-        contentContainerStyle={{ paddingTop: headerH + spacing.lg, paddingBottom: insets.bottom + 120, paddingHorizontal: spacing.lg, gap: spacing.md }}
+        contentContainerStyle={{ paddingTop: headerHeight + spacing.md, paddingBottom: insets.bottom + 120, paddingHorizontal: spacing.lg, gap: spacing.md }}
         showsVerticalScrollIndicator={false}
         renderItem={({ item: ch, index: i }) => {
           const open = prog.isChapterUnlocked(ch.id);
@@ -134,7 +168,7 @@ export default function MapScreen() {
         }}
       />
 
-      <GlassPanel style={[styles.header, { paddingTop: insets.top + spacing.sm }]} testID="home-header">
+      <GlassPanel onLayout={onHeaderLayout} style={[styles.header, { paddingTop: insets.top + spacing.xs }]} testID="home-header">
         <View style={styles.titleRow}>
           <View style={{ flex: 1 }}>
             <Text style={styles.kicker} numberOfLines={1} testID="header-chapter">Chapter {chapter.id} · {chapter.name}</Text>
@@ -142,29 +176,32 @@ export default function MapScreen() {
           </View>
           <View style={styles.inline}>
             <View>
-              <ChunkyButton testID="open-spin-button" icon="ferris-wheel" variant="secondary" onPress={() => setSpinOpen(true)} />
+              <ChunkyButton testID="open-spin-button" icon="ferris-wheel" variant="secondary" onPress={() => setSpinOpen(true)} size="sm" />
               {prog.freeSpinReady ? <View style={[styles.dotBadge, { backgroundColor: colors.error }]} testID="spin-ready-badge" /> : null}
             </View>
-            <ChunkyButton testID="open-shop-button" icon="cart" variant="primary" onPress={() => router.push("/shop")} />
-            <ChunkyButton testID="open-leaderboard-button" icon="trophy" variant="secondary" onPress={() => router.push("/leaderboard")} />
-            <ChunkyButton testID="open-settings-button" icon="cog" variant="plain" onPress={() => setSettings(true)} />
+            <ChunkyButton testID="open-shop-button" icon="cart" variant="primary" onPress={() => router.push("/shop")} size="sm" />
+            <ChunkyButton testID="open-leaderboard-button" icon="trophy" variant="secondary" onPress={() => router.push("/leaderboard")} size="sm" />
+            <ChunkyButton testID="open-settings-button" icon="cog" variant="plain" onPress={() => setSettings(true)} size="sm" />
           </View>
         </View>
         <View style={styles.hud}>
           <Pressable testID="open-lives-button" onPress={() => setLivesOpen(true)}>
-            <CurrencyPill testID="hud-lives" icon="heart" iconColor={colors.heart} value={prog.lives} sub={prog.nextLifeIn ? formatMs(prog.nextLifeIn) : "Full"} />
+          <CurrencyPill testID="hud-lives" icon="heart" iconColor={colors.heart} value={prog.lives} sub={prog.nextLifeIn ? formatMs(prog.nextLifeIn) : "Full"} compact />
           </Pressable>
           <Pressable testID="open-shop-coins" onPress={() => router.push("/shop")}>
-            <CurrencyPill testID="hud-coins" icon="circle-multiple" iconColor={colors.gold} value={prog.coins} />
+          <CurrencyPill testID="hud-coins" icon="circle-multiple" iconColor={colors.gold} value={prog.coins} compact />
           </Pressable>
-          <CurrencyPill testID="hud-stars" icon="star" iconColor={colors.gold} value={prog.stars} />
+          <CurrencyPill testID="hud-stars" icon="star" iconColor={colors.gold} value={prog.stars} compact />
         </View>
       </GlassPanel>
 
-      <View style={[styles.bottomBar, { bottom: insets.bottom + spacing.lg }]} pointerEvents="box-none">
+      <View style={[styles.bottomBar, { bottom: insets.bottom + spacing.lg, pointerEvents: "box-none" }]}>
         <ChunkyButton testID="play-current-level-button" label={`Play ${currentLevel}`} icon="play" onPress={() => setPicked(getLevel(currentLevel) ?? null)} size="lg" />
         <ChunkyButton testID="open-heroes-button" icon="account-group" variant="primary" onPress={() => router.push("/heroes")} size="lg" />
-        <ChunkyButton testID="open-kingdom-button" icon="castle" variant="secondary" onPress={() => router.push("/kingdom")} size="lg" />
+        <View style={styles.kingdomAction}>
+          <ChunkyButton testID="open-kingdom-button" icon="castle" variant="secondary" onPress={() => router.push("/kingdom")} size="lg" />
+          <Text style={styles.kingdomActionLabel}>Restore</Text>
+        </View>
       </View>
 
       <LevelStartSheet level={picked} onClose={() => setPicked(null)} onPlay={play} onAdLife={adLife} />
@@ -185,7 +222,7 @@ export default function MapScreen() {
             <Text style={styles.label} testID="lives-modal-status">
               {prog.lives >= MAX_LIVES ? "Your lives are full!" : `Next life in ${formatMs(prog.nextLifeIn)}`}
             </Text>
-            <ChunkyButton testID="lives-ad-button" label="Watch ad · +1 life" icon="play-box" variant="secondary" disabled={prog.lives >= MAX_LIVES} onPress={adLife} />
+            <ChunkyButton testID="lives-ad-button" label={lifeAdBusy ? "Loading ad…" : prog.adLifeReady ? "Watch ad · +1 life" : "Life ad used today"} icon="play-box" variant="secondary" disabled={lifeAdBusy || prog.lives >= MAX_LIVES || !prog.adLifeReady} onPress={adLife} />
             <ChunkyButton
               testID="lives-refill-button"
               label={`Refill all · ${LIFE_REFILL_COST} coins`}
@@ -223,7 +260,10 @@ export default function MapScreen() {
             <View style={styles.settingRow}>
               <View style={styles.inline}>
                 <MaterialDesignIcons name="music" size={22} color={colors.onSurface} />
-                <Text style={styles.settingText}>Music</Text>
+                <Pressable onPress={cycleMusic} accessibilityRole="button" accessibilityLabel={`Change music. Current track: ${currentMusicName}`}>
+                  <Text style={styles.settingText}>Music · {currentMusicName}</Text>
+                  <Text style={styles.musicHint}>Tap track name to change</Text>
+                </Pressable>
               </View>
               <Switch testID="music-switch" value={prog.music} onValueChange={prog.setMusicOn} trackColor={{ true: colors.brand, false: colors.border }} />
             </View>
@@ -244,7 +284,7 @@ export default function MapScreen() {
 
 const useStyles = makeStyles((c) => ({
   root: { flex: 1, backgroundColor: c.surfaceInverse },
-  header: { position: "absolute", top: 0, left: 0, right: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTopWidth: 0, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: spacing.md },
+  header: { position: "absolute", top: 0, left: 0, right: 0, borderTopLeftRadius: 0, borderTopRightRadius: 0, borderTopWidth: 0, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.sm },
   chCard: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.md, ...lifted(c) },
   thumbWrap: { width: 72, height: 96, borderRadius: radius.md, overflow: "hidden" },
   thumb: { width: "100%", height: "100%" },
@@ -259,6 +299,8 @@ const useStyles = makeStyles((c) => ({
   title: { fontFamily: fonts.display, fontSize: 24, color: c.onSurface },
   hud: { flexDirection: "row", gap: spacing.sm },
   bottomBar: { position: "absolute", left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: spacing.md },
+  kingdomAction: { alignItems: "center", gap: 2 },
+  kingdomActionLabel: { fontFamily: fonts.textBold, fontSize: 10, color: c.onSurface, textShadowColor: "rgba(255,255,255,0.85)", textShadowRadius: 4 },
   dotBadge: { position: "absolute", top: -3, right: -3, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: c.surfaceSecondary },
   scrim: { flex: 1, backgroundColor: c.scrim },
   sheet: { backgroundColor: c.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.xl, paddingTop: spacing.md, gap: spacing.lg },
@@ -272,4 +314,5 @@ const useStyles = makeStyles((c) => ({
   card: { width: "100%", maxWidth: 380, backgroundColor: c.surface, borderRadius: radius.lg, padding: spacing.xl, gap: spacing.lg },
   settingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   settingText: { fontFamily: fonts.textBold, fontSize: 16, color: c.onSurface },
+  musicHint: { fontFamily: fonts.text, fontSize: 11, color: c.onSurfaceTertiary },
 }));

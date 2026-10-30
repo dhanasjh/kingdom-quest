@@ -1,7 +1,7 @@
 import React from "react";
 import { Modal, Text, View } from "react-native";
 import { BlurView } from "expo-blur";
-import Animated, { ZoomIn } from "react-native-reanimated";
+import Animated, { FadeInDown, ZoomIn } from "react-native-reanimated";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
 import { ChunkyButton } from "@/src/components/ChunkyButton";
@@ -11,6 +11,7 @@ import { fonts, lifted, makeStyles, radius, spacing, useTheme } from "@/src/them
 type Props = {
   visible: boolean;
   won: boolean;
+  festivalCelebration?: string;
   level: number;
   stars: number;
   score: number;
@@ -36,12 +37,18 @@ export function ResultsModal(p: Props) {
     <Modal visible={p.visible} transparent animationType="fade" statusBarTranslucent>
       <BlurView intensity={30} tint="dark" style={styles.backdrop}>
         <Animated.View entering={ZoomIn.springify().damping(14)} style={styles.card} testID="results-modal">
-          <Text style={styles.small}>Level {p.level}</Text>
-          <Text testID="results-title" style={[styles.title, { color: p.won ? colors.brand : colors.error }]}>
+          {p.won ? (
+            <Animated.View entering={ZoomIn.delay(80).duration(360)} style={styles.levelBadge}>
+              <MaterialDesignIcons name="crown" size={16} color={colors.onBrandSecondary} />
+              <Text style={styles.levelBadgeText}>LEVEL {p.level} COMPLETE</Text>
+            </Animated.View>
+          ) : <Text style={styles.small}>Level {p.level}</Text>}
+          <Animated.Text entering={FadeInDown.delay(130).duration(420)} testID="results-title" style={[styles.title, { color: p.won ? colors.brand : colors.error }]}>
             {p.won ? "Level Cleared!" : "Out of Moves"}
-          </Text>
+          </Animated.Text>
           {p.won ? (
             <>
+              {p.festivalCelebration ? <Animated.Text entering={ZoomIn.duration(450)} style={styles.festival}>{p.festivalCelebration} ✨ {p.festivalCelebration}</Animated.Text> : null}
               <StarRow stars={p.stars} size={56} animate testID="results-stars" />
               <View style={styles.row}>
                 <View style={styles.stat}>
@@ -116,6 +123,8 @@ const useStyles = makeStyles((c) => ({
     ...lifted(c),
   },
   small: { fontFamily: fonts.textBold, fontSize: 14, color: c.muted, textTransform: "uppercase", letterSpacing: 1 },
+  levelBadge: { flexDirection: "row", alignItems: "center", gap: 5, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, backgroundColor: "rgba(255,209,102,0.35)", borderWidth: 1, borderColor: "rgba(255,209,102,0.7)" },
+  levelBadgeText: { fontFamily: fonts.textBold, fontSize: 11, letterSpacing: 1, color: c.onSurface },
   title: { fontFamily: fonts.display, fontSize: 32 },
   row: { flexDirection: "row", gap: spacing.md, justifyContent: "center" },
   stat: { alignItems: "center", backgroundColor: c.surfaceTertiary, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, minWidth: 90 },
@@ -126,4 +135,5 @@ const useStyles = makeStyles((c) => ({
   heartWrap: { alignItems: "center", gap: 4 },
   offer: { alignSelf: "stretch", gap: spacing.sm, backgroundColor: c.surfaceTertiary, borderRadius: radius.lg, padding: spacing.md },
   offerTitle: { fontFamily: fonts.display, fontSize: 18, color: c.onSurface, textAlign: "center" },
+  festival: { fontSize: 34, textAlign: "center" },
 }));

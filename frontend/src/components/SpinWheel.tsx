@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Modal, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -44,11 +44,14 @@ export function SpinWheel({ visible, onClose }: { visible: boolean; onClose: () 
   const [spinning, setSpinning] = useState(false);
   const [adBusy, setAdBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const spinLock = useRef(false);
+  const adLock = useRef(false);
   const segColors = [colors.brand, colors.brandSecondary, colors.brandPrimary, colors.brandTertiary];
   const wheelStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${rot.value}deg` }] }));
 
   const spin = (kind: "free" | "ad") => {
-    if (spinning) return;
+    if (spinLock.current || (kind === "free" && !prog.freeSpinReady) || (kind === "ad" && !prog.adSpinReady)) return;
+    spinLock.current = true;
     const total = PRIZES.reduce((s, p) => s + p.w, 0);
     let roll = Math.random() * total;
     let idx = 0;
@@ -70,14 +73,21 @@ export function SpinWheel({ visible, onClose }: { visible: boolean; onClose: () 
       prog.haptic("success");
       setResult(`You won ${prize.text}!`);
       setSpinning(false);
+      spinLock.current = false;
     }, 4300);
   };
 
   const adSpin = async () => {
+    if (!prog.adSpinReady || adLock.current || spinLock.current) return;
+    adLock.current = true;
     setAdBusy(true);
-    const ok = await showAd("daily-spin");
-    setAdBusy(false);
-    if (ok) setTimeout(() => spin("ad"), 400);
+    try {
+      const ok = await showAd("daily-spin");
+      if (ok) spin("ad");
+    } finally {
+      adLock.current = false;
+      setAdBusy(false);
+    }
   };
 
   return (
@@ -115,7 +125,7 @@ export function SpinWheel({ visible, onClose }: { visible: boolean; onClose: () 
           </View>
           {result ? <Text style={styles.result} testID="spin-result">{result}</Text> : null}
           {prog.freeSpinReady ? (
-            <ChunkyButton testID="spin-free-button" label={spinning ? "Spinning..." : "Spin for free!"} icon="sync" size="lg" disabled={spinning} onPress={() => spin("free")} />
+            <ChunkyButton testID="spin-free-button" label={spinning ? "Spinning..." : `Free spin · ${prog.freeSpinsRemaining} left today`} icon="sync" size="lg" disabled={spinning} onPress={() => spin("free")} />
           ) : (
             <>
               <Text style={styles.sub} testID="spin-next-free">Next free spin in {fmtHours(prog.nextFreeSpinIn)}</Text>

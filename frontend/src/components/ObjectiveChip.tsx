@@ -8,7 +8,7 @@ import type { Objective } from "@/src/game/levels";
 import { OBJECTIVE_ICON, PIECES } from "@/src/game/pieces";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
-export function ObjectiveChip({ obj, remaining, testID, roster }: { obj: Objective; remaining: number; testID: string; roster?: number[] }) {
+export function ObjectiveChip({ obj, remaining, testID, roster, customPhotos }: { obj: Objective; remaining: number; testID: string; roster?: number[]; customPhotos?: (string | null)[] }) {
   const styles = useStyles();
   const { colors } = useTheme();
   const done = remaining <= 0;
@@ -17,7 +17,7 @@ export function ObjectiveChip({ obj, remaining, testID, roster }: { obj: Objecti
     <View style={styles.chip}>
       {piece ? (
         <View style={[styles.icon, { backgroundColor: piece.from, overflow: "hidden" }]}>
-          <Image source={artFor(obj.color ?? 0, roster)} style={{ width: 30, height: 30 }} contentFit="cover" />
+          <Image source={artFor(obj.color ?? 0, roster, customPhotos)} style={{ width: 23, height: 23 }} contentFit="cover" />
         </View>
       ) : (
         <View style={[styles.icon, { backgroundColor: obj.type === "crate" ? colors.crate : obj.type === "vine" ? colors.success : obj.type === "ice" ? colors.info : colors.muted }]}>
@@ -37,6 +37,6 @@ export function ObjectiveChip({ obj, remaining, testID, roster }: { obj: Objecti
 
 const useStyles = makeStyles((c) => ({
   chip: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 },
-  icon: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  count: { fontFamily: fonts.display, fontSize: 18, color: c.onSurface, minWidth: 22 },
+  icon: { width: 25, height: 25, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  count: { fontFamily: fonts.display, fontSize: 15, color: c.onSurface, minWidth: 20 },
 }));

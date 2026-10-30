@@ -52,8 +52,8 @@ const light = {
   // Game extras
   scrim: "rgba(30,24,20,0.55)",
   boardFrame: "rgba(255,255,255,0.3)",
-  cellA: "rgba(255,255,255,0.55)",
-  cellB: "rgba(255,255,255,0.36)",
+  cellA: "rgba(255,255,255,0.4)",
+  cellB: "rgba(255,255,255,0.26)",
   ice: "rgba(140,215,255,0.55)",
   iceStrong: "rgba(80,175,240,0.75)",
   crate: "#B07A45",

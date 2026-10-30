@@ -49,7 +49,7 @@ export function ChapterBackground({ chapter, dim = true }: { chapter: number; di
     [width],
   );
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none" testID="chapter-background">
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]} testID="chapter-background">
       <Animated.View style={[StyleSheet.absoluteFill, panStyle]}>
         <Image source={CHAPTER_BG[(chapter - 1) % CHAPTER_BG.length]} style={StyleSheet.absoluteFill} contentFit="cover" transition={400} />
       </Animated.View>

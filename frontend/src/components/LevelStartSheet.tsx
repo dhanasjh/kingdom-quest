@@ -55,7 +55,7 @@ export function LevelStartSheet({ level, onClose, onPlay, onAdLife }: Props) {
               <Text style={[styles.label, { color: colors.error }]} testID="no-lives-text">
                 Out of lives. Next life in {formatMs(prog.nextLifeIn)}
               </Text>
-              <ChunkyButton testID="level-sheet-ad-life-button" label="Watch ad · +1 life" icon="play-box" variant="secondary" onPress={onAdLife} />
+              <ChunkyButton testID="level-sheet-ad-life-button" label={prog.adLifeReady ? "Watch ad · +1 life" : "Life ad used today"} icon="play-box" variant="secondary" disabled={!prog.adLifeReady} onPress={onAdLife} />
             </>
           ) : null}
           <ChunkyButton testID="level-sheet-play-button" label="Play" icon="play" size="lg" disabled={prog.lives <= 0} onPress={() => onPlay(level.id)} />

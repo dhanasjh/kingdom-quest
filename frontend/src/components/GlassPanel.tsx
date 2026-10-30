@@ -1,11 +1,11 @@
 import React from "react";
-import { Platform, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
+import { LayoutChangeEvent, Platform, StyleProp, StyleSheet, View, ViewStyle } from "react-native";
 import { BlurView } from "expo-blur";
 
 import { radius, useTheme } from "@/src/theme";
 
 // Absolute blur + white tint + top sheen. Drop as first child of any container.
-export function GlassFill({ blur = true, strong = false }: { blur?: boolean; strong?: boolean }) {
+export function GlassFill({ blur = true, strong = false, tint, sheenOpacity }: { blur?: boolean; strong?: boolean; tint?: string; sheenOpacity?: number }) {
   const { colors } = useTheme();
   return (
     <>
@@ -17,18 +17,18 @@ export function GlassFill({ blur = true, strong = false }: { blur?: boolean; str
           style={StyleSheet.absoluteFill}
         />
       ) : null}
-      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: strong ? colors.glassTintStrong : colors.glassTint }]} />
-      <View pointerEvents="none" style={[styles.sheen, { backgroundColor: colors.glassSheen }]} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: tint ?? (strong ? colors.glassTintStrong : colors.glassTint), pointerEvents: "none" }]} />
+      <View style={[styles.sheen, { backgroundColor: colors.glassSheen, opacity: sheenOpacity ?? 0.6, pointerEvents: "none" }]} />
     </>
   );
 }
 
-type Props = { children?: React.ReactNode; style?: StyleProp<ViewStyle>; blur?: boolean; strong?: boolean; testID?: string };
+type Props = { children?: React.ReactNode; style?: StyleProp<ViewStyle>; blur?: boolean; strong?: boolean; testID?: string; onLayout?: (event: LayoutChangeEvent) => void };
 
-export function GlassPanel({ children, style, blur = true, strong, testID }: Props) {
+export function GlassPanel({ children, style, blur = true, strong, testID, onLayout }: Props) {
   const { colors } = useTheme();
   return (
-    <View testID={testID} style={[styles.base, { borderColor: colors.glassBorder }, style]}>
+    <View testID={testID} onLayout={onLayout} style={[styles.base, { borderColor: colors.glassBorder }, style]}>
       <GlassFill blur={blur} strong={strong} />
       {children}
     </View>

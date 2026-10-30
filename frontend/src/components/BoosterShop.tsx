@@ -6,15 +6,16 @@ import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-
 import { ChunkyButton } from "@/src/components/ChunkyButton";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
-export type BoosterKind = "hammer" | "shuffle";
+export type BoosterKind = "hammer" | "shuffle" | "snake";
 export const BOOSTER_INFO: Record<BoosterKind, { name: string; icon: string; cost: number; desc: string }> = {
   hammer: { name: "Hammer", icon: "hammer", cost: 120, desc: "Smash any single tile, crate, lock or vine. No move used." },
   shuffle: { name: "Shuffle", icon: "shuffle-variant", cost: 80, desc: "Mix up all free pieces on the board. No move used." },
+  snake: { name: "Royal Snake", icon: "snake", cost: 500, desc: "On a hard level, the Royal Snake clears the objectives and wins the level." },
 };
 
-type Props = { kind: BoosterKind | null; count: number; coins: number; onBuy: () => void; onWatchAd: () => void; onClose: () => void };
+type Props = { kind: BoosterKind | null; count: number; coins: number; watchAdAvailable: boolean; watchAdBusy: boolean; onBuy: () => void; onWatchAd: () => void; onClose: () => void };
 
-export function BoosterShop({ kind, count, coins, onBuy, onWatchAd, onClose }: Props) {
+export function BoosterShop({ kind, count, coins, watchAdAvailable, watchAdBusy, onBuy, onWatchAd, onClose }: Props) {
   const styles = useStyles();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -36,7 +37,7 @@ export function BoosterShop({ kind, count, coins, onBuy, onWatchAd, onClose }: P
           </View>
           <Text style={styles.body} testID="booster-shop-owned">You have {count} · Coins {coins}</Text>
           <ChunkyButton testID="booster-buy-button" label={`Buy 1 · ${info.cost} coins`} icon="circle-multiple" disabled={coins < info.cost} onPress={onBuy} size="lg" />
-          <ChunkyButton testID="booster-ad-button" label="Watch ad · Get 1 free" icon="play-box" variant="secondary" onPress={onWatchAd} size="lg" />
+          <ChunkyButton testID="booster-ad-button" label={watchAdBusy ? "Loading ad…" : watchAdAvailable ? "Watch ad · Get 1 free" : "Free booster ad used today"} icon="play-box" variant="secondary" disabled={!watchAdAvailable || watchAdBusy} onPress={onWatchAd} size="lg" />
         </View>
       ) : null}
     </Modal>

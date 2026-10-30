@@ -60,7 +60,7 @@ export default function KingdomScreen() {
         <View style={[styles.dim, { opacity: 0.55 * (1 - pct) }]} />
         <LinearGradient colors={["rgba(45,42,38,0.55)", "transparent", "rgba(45,42,38,0.85)"]} style={styles.heroImgAbs} />
         <View style={[styles.heroTop, { paddingTop: insets.top + spacing.sm }]}>
-          <ChunkyButton testID="kingdom-back-button" icon="chevron-left" variant="plain" onPress={() => router.back()} />
+          <ChunkyButton testID="kingdom-back-button" icon="chevron-left" variant="plain" onPress={() => router.replace("/")} />
           <CurrencyPill testID="kingdom-stars" icon="star" iconColor={colors.gold} value={prog.stars} dark />
         </View>
         <View style={styles.heroBottom}>

@@ -4,6 +4,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-na
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
 import { fonts, lifted, useTheme } from "@/src/theme";
+import { playSfx } from "@/src/game/sound";
 
 type Variant = "brand" | "secondary" | "primary" | "plain";
 
@@ -15,7 +16,7 @@ type Props = {
   disabled?: boolean;
   testID?: string;
   style?: StyleProp<ViewStyle>;
-  size?: "md" | "lg";
+  size?: "xs" | "sm" | "md" | "lg";
 };
 
 export function ChunkyButton({ label, icon, onPress, variant = "brand", disabled, testID, style, size = "md" }: Props) {
@@ -29,14 +30,17 @@ export function ChunkyButton({ label, icon, onPress, variant = "brand", disabled
     plain: [colors.surfaceSecondary, colors.onSurfaceSecondary],
   };
   const [bg, fg] = palette[variant];
-  const h = size === "lg" ? 60 : 48;
+  const h = size === "lg" ? 60 : size === "sm" ? 40 : size === "xs" ? 34 : 48;
   return (
     <Animated.View style={[anim, style]}>
       <Pressable
         testID={testID}
         disabled={disabled}
         onPress={onPress}
-        onPressIn={() => scale.set(withSpring(0.95, { damping: 12, stiffness: 400 }))}
+        onPressIn={() => {
+          if (!disabled) playSfx("tap");
+          scale.set(withSpring(0.95, { damping: 12, stiffness: 400 }));
+        }}
         onPressOut={() => scale.set(withSpring(1, { damping: 8, stiffness: 300 }))}
         style={({ pressed }) => [
           styles.btn,
@@ -48,14 +52,14 @@ export function ChunkyButton({ label, icon, onPress, variant = "brand", disabled
             borderColor: colors.extrude,
             borderBottomWidth: pressed ? 2 : 6,
             transform: [{ translateY: pressed ? 4 : 0 }],
-            paddingHorizontal: label ? 24 : 0,
+            paddingHorizontal: label ? (size === "xs" ? 9 : size === "sm" ? 16 : 24) : 0,
             width: label ? undefined : h,
           },
         ]}
       >
-        <View pointerEvents="none" style={[styles.hi, { backgroundColor: colors.highlight }]} />
-        {icon ? <MaterialDesignIcons name={icon as any} size={size === "lg" ? 26 : 22} color={fg} /> : null}
-        {label ? <Text style={[styles.label, { color: fg, fontSize: size === "lg" ? 22 : 18 }]}>{label}</Text> : null}
+        <View style={[styles.hi, { backgroundColor: colors.highlight, pointerEvents: "none" }]} />
+        {icon ? <MaterialDesignIcons name={icon as any} size={size === "lg" ? 26 : size === "sm" ? 19 : size === "xs" ? 17 : 22} color={fg} /> : null}
+        {label ? <Text style={[styles.label, { color: fg, fontSize: size === "lg" ? 22 : size === "sm" ? 15 : size === "xs" ? 13 : 18 }]}>{label}</Text> : null}
       </Pressable>
     </Animated.View>
   );

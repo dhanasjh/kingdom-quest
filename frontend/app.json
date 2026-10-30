@@ -28,14 +28,20 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-image.png",
-          "imageWidth": 200,
+          "image": "./assets/images/splash-transparent.png",
+          "imageWidth": 1,
           "resizeMode": "contain",
-          "backgroundColor": "#FFF9F0"
+          "backgroundColor": "#A8DDF5"
         }
       ],
       "expo-font",
       "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Choose photos to create your private on-device game characters. Photos are not uploaded."
+        }
+      ],
       "expo-secure-store",
       "expo-web-browser",
       "expo-status-bar",

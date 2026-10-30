@@ -21,6 +21,16 @@
       "android": {
         "buildType": "app-bundle"
       }
+    },
+    "deviceTest": {
+      "distribution": "internal",
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_ADMOB_TEST_MODE": "true"
+      },
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {

@@ -1,10 +1,12 @@
 import React from "react";
-import { FlatList, Text, View, useWindowDimensions } from "react-native";
+import { Alert, FlatList, Pressable, Text, View, useWindowDimensions } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import Animated, { ZoomIn } from "react-native-reanimated";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
 
 import { ChapterBackground } from "@/src/components/ChapterBackground";
 import { ChunkyButton } from "@/src/components/ChunkyButton";
@@ -15,6 +17,8 @@ import { PIECES } from "@/src/game/pieces";
 import { useProgress } from "@/src/game/progress";
 import { fonts, lifted, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
+const photoFilename = (slot: number) => `character-${slot}-${Date.now()}.jpg`;
+
 export default function HeroesScreen() {
   const styles = useStyles();
   const { colors } = useTheme();
@@ -22,6 +26,38 @@ export default function HeroesScreen() {
   const router = useRouter();
   const { width } = useWindowDimensions();
   const prog = useProgress();
+  const choosePhoto = async (slot: number) => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.85 });
+      if (result.canceled || !result.assets[0]) return;
+      const pickedUri = result.assets[0].uri;
+      let localUri = pickedUri;
+      if (FileSystem.documentDirectory) {
+        const directory = `${FileSystem.documentDirectory}kingdom-quest-characters/`;
+        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+        localUri = `${directory}${photoFilename(slot)}`;
+        await FileSystem.copyAsync({ from: pickedUri, to: localUri });
+      }
+      const next = [...prog.characterPhotos];
+      const oldUri = next[slot];
+      next[slot] = localUri;
+      prog.update({ characterPhotos: next });
+      if (oldUri && FileSystem.documentDirectory && oldUri.startsWith(`${FileSystem.documentDirectory}kingdom-quest-characters/`)) {
+        await FileSystem.deleteAsync(oldUri, { idempotent: true }).catch(() => {});
+      }
+    } catch {
+      Alert.alert("Photo not added", "Please choose another image and try again.");
+    }
+  };
+  const clearPhoto = (slot: number) => {
+    const next = [...prog.characterPhotos];
+    const oldUri = next[slot];
+    next[slot] = null;
+    prog.update({ characterPhotos: next });
+    if (oldUri && FileSystem.documentDirectory && oldUri.startsWith(`${FileSystem.documentDirectory}kingdom-quest-characters/`)) {
+      void FileSystem.deleteAsync(oldUri, { idempotent: true }).catch(() => {});
+    }
+  };
   const cleared = Math.max(0, prog.unlocked - 1);
   const ids = CHARACTER_POOL.map((_, i) => i);
   const owned = ids.filter((i) => cleared >= heroUnlockLevel(i)).length;
@@ -37,6 +73,25 @@ export default function HeroesScreen() {
         keyExtractor={(i) => String(i)}
         columnWrapperStyle={{ gap: spacing.md }}
         contentContainerStyle={{ paddingTop: insets.top + 110, paddingBottom: insets.bottom + spacing.xxl, paddingHorizontal: spacing.lg, gap: spacing.md }}
+        ListHeaderComponent={
+          <View style={{ gap: spacing.md, marginBottom: spacing.md }}>
+            <GlassPanel blur={false} strong style={{ padding: spacing.md, gap: spacing.xs }}>
+              <Text style={styles.title}>Make it yours</Text>
+              <Text style={styles.small}>Choose up to six photos for your puzzle pieces. Photos stay in this app on this device and are never uploaded. Ask permission before using someone else’s photo.</Text>
+            </GlassPanel>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, justifyContent: "center" }}>
+              {prog.characterPhotos.map((uri, slot) => (
+                <Pressable key={slot} testID={`custom-character-slot-${slot}`} onPress={() => choosePhoto(slot)} onLongPress={() => uri && clearPhoto(slot)} style={{ width: size / 2.15, alignItems: "center", gap: 4 }}>
+                  <View style={{ width: size / 2.15, height: size / 2.15, borderRadius: radius.md, overflow: "hidden", backgroundColor: PIECES[slot].from, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.glassBorder }}>
+                    {uri ? <Image source={{ uri }} style={{ width: "100%", height: "100%" }} contentFit="cover" /> : <MaterialDesignIcons name="image-plus" size={28} color={colors.onSurfaceInverse} />}
+                  </View>
+                  <Text style={styles.small}>Piece {slot + 1}{uri ? " · hold to remove" : " · add photo"}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.small}>Or choose one of the original heroes below.</Text>
+          </View>
+        }
         renderItem={({ item: i, index }) => {
           const need = heroUnlockLevel(i);
           const open = cleared >= need;
@@ -55,7 +110,7 @@ export default function HeroesScreen() {
         }}
       />
       <GlassPanel style={[styles.header, { paddingTop: insets.top + spacing.sm }]} testID="heroes-header">
-        <ChunkyButton testID="heroes-back-button" icon="chevron-left" variant="plain" onPress={() => router.back()} />
+        <ChunkyButton testID="heroes-back-button" icon="chevron-left" variant="plain" onPress={() => router.replace("/")} />
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Hero Collection</Text>
           <Text style={styles.small} testID="heroes-owned">{owned}/{ids.length} heroes collected</Text>
