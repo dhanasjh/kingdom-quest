@@ -4,20 +4,36 @@ import { Image } from "expo-image";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
 import { artFor } from "@/src/game/art";
+import type { FestivalPack } from "@/src/game/festivals";
 import type { Objective } from "@/src/game/levels";
 import { OBJECTIVE_ICON, PIECES } from "@/src/game/pieces";
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
-export function ObjectiveChip({ obj, remaining, testID, roster, customPhotos }: { obj: Objective; remaining: number; testID: string; roster?: number[]; customPhotos?: (string | null)[] }) {
+type Props = {
+  obj: Objective;
+  remaining: number;
+  testID: string;
+  roster?: number[];
+  customPhotos?: (string | null)[];
+  festivalTiles?: FestivalPack["tiles"];
+};
+
+export function ObjectiveChip({ obj, remaining, testID, roster, customPhotos, festivalTiles }: Props) {
   const styles = useStyles();
   const { colors } = useTheme();
   const done = remaining <= 0;
-  const piece = obj.type === "color" ? PIECES[obj.color ?? 0] : null;
+  const color = obj.color ?? 0;
+  const piece = obj.type === "color" ? PIECES[color] : null;
+  const festivalTile = festivalTiles?.[color];
   return (
     <View style={styles.chip}>
       {piece ? (
         <View style={[styles.icon, { backgroundColor: piece.from, overflow: "hidden" }]}>
-          <Image source={artFor(obj.color ?? 0, roster, customPhotos)} style={{ width: 23, height: 23 }} contentFit="cover" />
+          {festivalTile ? (
+            <Text style={styles.festivalTile}>{festivalTile}</Text>
+          ) : (
+            <Image source={artFor(color, roster, customPhotos)} style={{ width: 23, height: 23 }} contentFit="cover" />
+          )}
         </View>
       ) : (
         <View style={[styles.icon, { backgroundColor: obj.type === "crate" ? colors.crate : obj.type === "vine" ? colors.success : obj.type === "ice" ? colors.info : colors.muted }]}>
@@ -38,5 +54,6 @@ export function ObjectiveChip({ obj, remaining, testID, roster, customPhotos }: 
 const useStyles = makeStyles((c) => ({
   chip: { flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 },
   icon: { width: 25, height: 25, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  festivalTile: { fontSize: 18, includeFontPadding: false },
   count: { fontFamily: fonts.display, fontSize: 15, color: c.onSurface, minWidth: 20 },
 }));

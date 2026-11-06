@@ -109,44 +109,54 @@ def make_startup_fanfare() -> None:
 
 
 def make_kingdom_theme() -> None:
-    """An original, cinematic orchestral fantasy theme for the main adventure."""
-    bpm = 78
+    """An original, upbeat puzzle-adventure theme for the main adventure."""
+    bpm = 112
     beat = 60 / bpm
     bars = 8
     track = [0.0] * int(beat * 4 * bars * RATE)
     chords = [
-        (55, 59, 62, 67),  # G major / D
-        (54, 57, 62, 66),  # D / F-sharp
-        (52, 55, 59, 64),  # E minor 7
-        (48, 52, 55, 62),  # C add 9
-        (50, 55, 59, 62),  # G / B
-        (50, 54, 57, 62),  # D
-        (48, 52, 55, 60),  # C major
-        (50, 55, 59, 62),  # resolve through D back to G
+        (60, 64, 67, 74),  # C add 9
+        (55, 59, 62, 67),  # G major
+        (57, 60, 64, 69),  # A minor 7
+        (53, 57, 60, 65),  # F major
+        (60, 64, 67, 72),  # C major
+        (55, 59, 62, 67),  # G major
+        (53, 57, 60, 65),  # F major
+        (60, 64, 67, 74),  # C add 9, resolves to the first bar
     ]
     melody = (
-        ((0.0, 74, 1.55), (1.7, 79, 1.0), (3.0, 81, 0.82)),
-        ((0.0, 78, 1.45), (1.65, 74, 0.9), (2.8, 71, 1.0)),
-        ((0.0, 76, 1.35), (1.5, 79, 0.9), (2.6, 83, 1.15)),
-        ((0.0, 81, 1.3), (1.55, 79, 0.85), (2.65, 76, 1.1)),
-        ((0.0, 79, 1.25), (1.45, 83, 0.85), (2.55, 86, 1.2)),
-        ((0.0, 85, 1.25), (1.55, 83, 0.85), (2.65, 81, 1.05)),
-        ((0.0, 79, 1.2), (1.5, 84, 0.85), (2.6, 83, 1.1)),
-        ((0.0, 81, 1.0), (1.15, 79, 1.0), (2.45, 74, 1.4)),
+        (72, 76, 79, 81, 79, 76, 74, 76),
+        (79, 83, 86, 83, 81, 79, 76, 79),
+        (81, 84, 88, 86, 84, 81, 79, 81),
+        (77, 81, 84, 81, 79, 77, 76, 77),
+        (72, 76, 79, 84, 83, 79, 76, 79),
+        (79, 83, 86, 88, 86, 83, 81, 79),
+        (77, 81, 84, 86, 84, 81, 79, 77),
+        (76, 79, 84, 83, 79, 76, 74, 72),
     )
     for bar in range(bars):
         chord = chords[bar]
         start = bar * beat * 4
         for pitch in chord:
-            add_tone(track, start, pitch - 12, beat * 4, 0.075, "strings")
-            add_tone(track, start, pitch, beat * 4, 0.043, "strings")
-        # Slow low-register swells give the progression an orchestral foundation.
-        add_tone(track, start, chord[0] - 24, beat * 3.6, 0.12, "brass")
-        for beat_offset, pitch, length in melody[bar]:
-            add_tone(track, start + beat * beat_offset, pitch, beat * length, 0.19, "strings")
-        # Sparse high chimes add a fairytale shimmer without driving the rhythm.
-        if bar in (0, 2, 4, 6):
-            add_tone(track, start + beat * 3.25, chord[-1] + 12, beat * 0.7, 0.055, "mallet")
+            add_tone(track, start, pitch - 12, beat * 3.85, 0.060, "pad")
+        # A soft bass pulse and broken-chord plucks keep the loop buoyant.
+        add_tone(track, start, chord[0] - 12, beat * 0.72, 0.16, "bass")
+        add_tone(track, start + beat * 2, chord[0] - 12, beat * 0.58, 0.095, "bass")
+        arpeggio = (chord[0], chord[2], chord[1], chord[3])
+        for beat_offset, pitch in zip((0.5, 1.5, 2.5, 3.5), arpeggio):
+            add_tone(track, start + beat * beat_offset, pitch + 12, beat * 0.38, 0.20, "pluck")
+        # A short, memorable mallet hook sits above the rhythm without crowding play.
+        for step, pitch in enumerate(melody[bar]):
+            if step in (1, 3, 4, 6, 7):
+                add_tone(track, start + beat * (step * 0.5), pitch, beat * 0.43, 0.27, "mallet")
+        if bar in (1, 3, 5, 7):
+            add_tone(track, start + beat * 3.5, chord[-1] + 12, beat * 0.48, 0.12, "mallet")
+    # Short edge fades soften the seam when the background loop repeats.
+    fade_samples = int(0.045 * RATE)
+    for index in range(fade_samples):
+        gain = index / max(1, fade_samples - 1)
+        track[index] *= gain
+        track[-index - 1] *= gain
     write_wav("music_kingdom.wav", track, 0.34)
 
 

@@ -257,14 +257,12 @@ export default function MapScreen() {
               </View>
               <Switch testID="sound-switch" value={prog.sound} onValueChange={prog.setSoundOn} trackColor={{ true: colors.brand, false: colors.border }} />
             </View>
-            <View style={styles.settingRow}>
-              <View style={styles.inline}>
-                <MaterialDesignIcons name="music" size={22} color={colors.onSurface} />
-                <Pressable onPress={cycleMusic} accessibilityRole="button" accessibilityLabel={`Change music. Current track: ${currentMusicName}`}>
-                  <Text style={styles.settingText}>Music · {currentMusicName}</Text>
-                  <Text style={styles.musicHint}>Tap track name to change</Text>
-                </Pressable>
-              </View>
+            <View style={styles.musicSettingRow}>
+              <MaterialDesignIcons name="music" size={22} color={colors.onSurface} />
+              <Pressable style={styles.musicDetails} onPress={cycleMusic} accessibilityRole="button" accessibilityLabel={`Change music. Current track: ${currentMusicName}`}>
+                <Text style={styles.settingText} numberOfLines={1} ellipsizeMode="tail">Music · {currentMusicName}</Text>
+                <Text style={styles.musicHint}>Tap track name to change</Text>
+              </Pressable>
               <Switch testID="music-switch" value={prog.music} onValueChange={prog.setMusicOn} trackColor={{ true: colors.brand, false: colors.border }} />
             </View>
             {confirmReset ? (
@@ -313,6 +311,8 @@ const useStyles = makeStyles((c) => ({
   center: { flex: 1, backgroundColor: c.scrim, alignItems: "center", justifyContent: "center", padding: spacing.xl },
   card: { width: "100%", maxWidth: 380, backgroundColor: c.surface, borderRadius: radius.lg, padding: spacing.xl, gap: spacing.lg },
   settingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  musicSettingRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  musicDetails: { flex: 1, minWidth: 0 },
   settingText: { fontFamily: fonts.textBold, fontSize: 16, color: c.onSurface },
   musicHint: { fontFamily: fonts.text, fontSize: 11, color: c.onSurfaceTertiary },
 }));

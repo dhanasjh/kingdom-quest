@@ -6,6 +6,7 @@ import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-
 import { ChunkyButton } from "@/src/components/ChunkyButton";
 import { ObjectiveChip } from "@/src/components/ObjectiveChip";
 import { StarRow } from "@/src/components/StarRow";
+import { festivalForLevel } from "@/src/game/festivals";
 import { CHAPTERS, LevelDef, chapterOf, levelInChapter } from "@/src/game/levels";
 import { formatMs, useProgress } from "@/src/game/progress";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
@@ -17,6 +18,7 @@ export function LevelStartSheet({ level, onClose, onPlay, onAdLife }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const prog = useProgress();
+  const festival = festivalForLevel(prog.activeFestival);
   const ch = level ? CHAPTERS[chapterOf(level.id) - 1] : null;
   return (
     <Modal visible={!!level} transparent animationType="slide" onRequestClose={onClose}>
@@ -43,7 +45,7 @@ export function LevelStartSheet({ level, onClose, onPlay, onAdLife }: Props) {
           <Text style={styles.label}>Goals</Text>
           <View style={styles.goals}>
             {level.objectives.map((o, i) => (
-              <ObjectiveChip key={i} obj={o} remaining={o.count} roster={level.roster} testID={`level-sheet-goal-${i}`} />
+              <ObjectiveChip key={i} obj={o} remaining={o.count} roster={level.roster} customPhotos={prog.characterPhotos} festivalTiles={festival?.tiles} testID={`level-sheet-goal-${i}`} />
             ))}
           </View>
           <View style={styles.row}>

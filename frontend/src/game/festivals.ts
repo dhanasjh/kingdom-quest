@@ -68,3 +68,7 @@ export function diwaliEventActive(date = new Date()) {
   const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   return key >= "2026-11-06" && key <= "2026-11-10";
 }
+
+export function festivalForLevel(activeFestival?: string | null) {
+  return festivalPack(activeFestival) ?? (diwaliEventActive() ? festivalPack("diwali") : undefined);
+}

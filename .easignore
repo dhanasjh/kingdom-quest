@@ -1,0 +1,46 @@
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# JavaScript / Expo dependencies and generated output
+node_modules/
+frontend/.expo/
+frontend/.metro-cache/
+frontend/dist/
+frontend/web-build/
+frontend/*.tsbuildinfo
+
+# Native Android build outputs are generated again by EAS; uploading them
+# wastes disk space and can exhaust the local temporary archive directory.
+/frontend/android/.gradle/
+/frontend/android/.kotlin/
+/frontend/android/build/
+/frontend/android/app/build/
+/frontend/android/app/.cxx/
+/frontend/android/local.properties
+
+# Local tooling and OS files
+.DS_Store
+Thumbs.db
+
+# Pytest local caches and temporary directories
+.pytest_cache/
+**/.pytest_cache/
+**/.pytest-tmp-*/
+
+# EAS Android app build does not need the separately deployed backend
+/backend/
+
+# Exclude local-only build notes and Git metadata
+/h Kingdom Quest gameplay and prepare Android build*
+.git/

@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 
 import { ErrorBoundary } from "@/src/components/error-boundary";
+import { StartupIntro } from "@/src/components/StartupIntro";
 import { queryClient } from "@/src/query-client";
 import { ProgressProvider } from "@/src/game/progress";
 import { AudioRoot } from "@/src/game/AudioRoot";
@@ -44,6 +45,7 @@ export default function RootLayout() {
                 <RewardedAdProvider>
                   <StatusBar style="dark" />
                   <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.surface } }} />
+                  <StartupIntro />
                 </RewardedAdProvider>
               </AudioRoot>
             </ProgressProvider>

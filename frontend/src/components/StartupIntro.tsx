@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,13 +21,12 @@ const SPARKLES = [
 export function StartupIntro() {
   const { ready, music } = useProgress();
   const [visible, setVisible] = useState(true);
+  const introAudioStarted = useRef(false);
   const scale = useSharedValue(0.72);
   const glow = useSharedValue(0.78);
   const tilt = useSharedValue(0);
 
   useEffect(() => {
-    if (!ready) return;
-    beginStartupIntro(music);
     scale.value = withSpring(1, { damping: 10, stiffness: 100, mass: 0.9 });
     glow.value = withRepeat(withSequence(withTiming(1.08, { duration: 800, easing: Easing.inOut(Easing.quad) }), withTiming(0.92, { duration: 900, easing: Easing.inOut(Easing.quad) })), -1, true);
     tilt.value = withSequence(withTiming(-2, { duration: 520 }), withRepeat(withSequence(withTiming(2, { duration: 700 }), withTiming(-2, { duration: 700 })), 1, true), withTiming(0, { duration: 400 }));
@@ -35,16 +34,21 @@ export function StartupIntro() {
       setVisible(false);
       finishStartupIntro();
     }, 3000);
-    return () => {
-      clearTimeout(timer);
-      finishStartupIntro();
-    };
-  }, [ready, music, scale, glow, tilt]);
+    return () => clearTimeout(timer);
+  }, [scale, glow, tilt]);
+
+  useEffect(() => {
+    if (!ready || !visible || introAudioStarted.current) return;
+    introAudioStarted.current = true;
+    beginStartupIntro(music);
+  }, [ready, visible, music]);
+
+  useEffect(() => () => finishStartupIntro(), []);
 
   const iconMotion = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }, { rotate: `${tilt.value}deg` }] }));
   const haloMotion = useAnimatedStyle(() => ({ transform: [{ scale: glow.value }], opacity: 0.45 + (glow.value - 0.78) * 1.15 }));
 
-  if (!ready || !visible) return null;
+  if (!visible) return null;
   return (
     <Animated.View entering={FadeIn.duration(250)} exiting={FadeOut.duration(350)} style={styles.overlay} testID="startup-intro">
       <StatusBar hidden />

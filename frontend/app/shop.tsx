@@ -11,7 +11,7 @@ import { ChunkyButton } from "@/src/components/ChunkyButton";
 import { CurrencyPill } from "@/src/components/CurrencyPill";
 import { GlassPanel } from "@/src/components/GlassPanel";
 import { BOOSTER_INFO, BoosterKind } from "@/src/components/BoosterShop";
-import { PRODUCTS, Product, purchase } from "@/src/iap/purchases";
+import { PRODUCTS, Product, purchase, UNLOCK_ALL_PRODUCT_ID } from "@/src/iap/purchases";
 import { rcAvailable, rcRestorePurchases, rcRestoreUnlock } from "@/src/iap/rc";
 import { chapterOf } from "@/src/game/levels";
 import { todayKey, useProgress } from "@/src/game/progress";
@@ -63,7 +63,7 @@ export default function ShopScreen() {
     const r = await rcRestoreUnlock();
     if (r === null) return setToast("Restore requires a configured native store build");
     if (r) {
-      prog.recordPurchase("unlock_all", true);
+      prog.recordPurchase(UNLOCK_ALL_PRODUCT_ID, true);
       setToast("All chapters restored!");
     } else setToast(purchasesRestored ? "Purchases restored; consumable items are not re-granted" : "No purchases to restore");
   };

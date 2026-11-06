@@ -23,7 +23,7 @@ import { StarterOffer } from "@/src/components/StarterOffer";
 import { useProgress } from "@/src/game/progress";
 import { CHARACTER_NAMES, DEFAULT_ROSTER, heroUnlockLevel } from "@/src/game/art";
 import { comboSfx, playSfx } from "@/src/game/sound";
-import { diwaliEventActive, festivalMatch, festivalPack } from "@/src/game/festivals";
+import { festivalForLevel, festivalMatch } from "@/src/game/festivals";
 import type { FestivalEffectType } from "@/src/game/festivals";
 import { fonts, lifted, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
@@ -48,8 +48,7 @@ export default function LevelScreen() {
   const styles = useStyles();
   const { colors } = useTheme();
   const prog = useProgress();
-  const diwaliActive = diwaliEventActive();
-  const festival = festivalPack(prog.activeFestival) ?? (diwaliActive ? festivalPack("diwali") : undefined);
+  const festival = festivalForLevel(prog.activeFestival);
 
   const [board, setBoard] = useState<Board | null>(null);
   const [phase, setPhase] = useState<Phase>("loading");
@@ -205,7 +204,7 @@ export default function LevelScreen() {
         cheered = true;
         if (celebration) setCheer(createCheer(celebration.color, celebration.effect, celebration.emoji, celebration.label));
         else {
-          setCheer(createCheer(topColor));
+          setCheer(createCheer(topColor, undefined, festival?.tiles[topColor]));
           setTimeout(() => playSfx("cheer"), 120);
         }
       }
@@ -471,7 +470,7 @@ export default function LevelScreen() {
         </View>
         <View style={styles.objRow} testID="objectives-row">
           {level.objectives.map((o, i) => (
-            <ObjectiveChip key={i} obj={o} remaining={remainingFor(o, stats)} roster={level.roster} customPhotos={prog.characterPhotos} testID={`objective-remaining-${i}`} />
+            <ObjectiveChip key={i} obj={o} remaining={remainingFor(o, stats)} roster={level.roster} customPhotos={prog.characterPhotos} festivalTiles={festival?.tiles} testID={`objective-remaining-${i}`} />
           ))}
         </View>
         <ScoreBar progress={progress} marks={[thresholds[1] / thresholds[2], 1]} score={stats.score} />
