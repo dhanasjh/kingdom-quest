@@ -116,9 +116,9 @@ export default function MapScreen() {
         ListHeaderComponent={(
           <View style={{ gap: spacing.md }}>
             <AdventureTrail currentLevel={currentLevel} unlockedLevel={prog.unlocked} onSelect={(id) => setPicked(getLevel(id) ?? null)} />
+            <MakeItYoursBanner hasPhotos={prog.characterPhotos.some(Boolean)} onPress={() => router.push("/heroes")} />
             <DailyQuest />
             <FestivalBanner onPress={() => router.push("/shop")} />
-            <MakeItYoursBanner onPress={() => router.push("/heroes")} />
           </View>
         )}
         data={CHAPTERS}
@@ -197,7 +197,10 @@ export default function MapScreen() {
 
       <View style={[styles.bottomBar, { bottom: insets.bottom + spacing.lg, pointerEvents: "box-none" }]}>
         <ChunkyButton testID="play-current-level-button" label={`Play ${currentLevel}`} icon="play" onPress={() => setPicked(getLevel(currentLevel) ?? null)} size="lg" />
-        <ChunkyButton testID="open-heroes-button" icon="account-group" variant="primary" onPress={() => router.push("/heroes")} size="lg" />
+        <View style={styles.kingdomAction}>
+          <ChunkyButton testID="open-heroes-button" icon="image-multiple" accessibilityLabel="Personal photos and hero collection" variant="primary" onPress={() => router.push("/heroes")} size="lg" />
+          <Text style={styles.kingdomActionLabel}>Photos</Text>
+        </View>
         <View style={styles.kingdomAction}>
           <ChunkyButton testID="open-kingdom-button" icon="castle" variant="secondary" onPress={() => router.push("/kingdom")} size="lg" />
           <Text style={styles.kingdomActionLabel}>Restore</Text>

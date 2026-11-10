@@ -61,14 +61,16 @@ export function festivalMatch(pack: FestivalPack | undefined, counts: number[]):
 }
 
 export const festivalPack = (id?: string | null) => FESTIVAL_PACKS.find((p) => p.id === id);
+export const NORMAL_TILE_MODE = "normal";
 
 // Diwali celebration dates for 2026 (local device calendar). Pack remains available year-round.
 export function diwaliEventActive(date = new Date()) {
-  if (process.env.EXPO_PUBLIC_DIWALI_PREVIEW === "true") return true;
+  if (__DEV__ && process.env.EXPO_PUBLIC_DIWALI_PREVIEW === "true") return true;
   const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  return key >= "2026-11-06" && key <= "2026-11-10";
+  return key >= "2026-11-06" && key <= "2026-11-08";
 }
 
-export function festivalForLevel(activeFestival?: string | null) {
-  return festivalPack(activeFestival) ?? (diwaliEventActive() ? festivalPack("diwali") : undefined);
+export function festivalForLevel(activeFestival?: string | null, date = new Date()) {
+  if (activeFestival === NORMAL_TILE_MODE) return undefined;
+  return festivalPack(activeFestival) ?? (diwaliEventActive(date) ? festivalPack("diwali") : undefined);
 }

@@ -5,6 +5,10 @@
 **/.env
 **/.env.*
 !**/.env.example
+credentials.json
+*.jks
+*.keystore
+!/frontend/android/app/debug.keystore
 
 # Python
 __pycache__/
@@ -28,10 +32,14 @@ frontend/*.tsbuildinfo
 /frontend/android/app/build/
 /frontend/android/app/.cxx/
 /frontend/android/local.properties
+*.aab
+*.apk
 
 # Local tooling and OS files
 .DS_Store
 Thumbs.db
+.idea/
+/.gradle-home-codex/
 
 # Pytest local caches and temporary directories
 .pytest_cache/

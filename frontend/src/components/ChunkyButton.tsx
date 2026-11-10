@@ -10,6 +10,7 @@ type Variant = "brand" | "secondary" | "primary" | "plain";
 
 type Props = {
   label?: string;
+  accessibilityLabel?: string;
   icon?: string;
   onPress: () => void;
   variant?: Variant;
@@ -19,7 +20,7 @@ type Props = {
   size?: "xs" | "sm" | "md" | "lg";
 };
 
-export function ChunkyButton({ label, icon, onPress, variant = "brand", disabled, testID, style, size = "md" }: Props) {
+export function ChunkyButton({ label, accessibilityLabel, icon, onPress, variant = "brand", disabled, testID, style, size = "md" }: Props) {
   const { colors } = useTheme();
   const scale = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -35,6 +36,8 @@ export function ChunkyButton({ label, icon, onPress, variant = "brand", disabled
     <Animated.View style={[anim, style]}>
       <Pressable
         testID={testID}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
         disabled={disabled}
         onPress={onPress}
         onPressIn={() => {

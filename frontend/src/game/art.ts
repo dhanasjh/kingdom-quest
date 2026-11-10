@@ -44,6 +44,15 @@ export const DEFAULT_ROSTER = [0, 3, 6, 9, 12, 15];
 export const artFor = (color: number, roster?: number[], customPhotos?: (string | null)[]) =>
   customPhotos?.[color] ? { uri: customPhotos[color] as string } : CHARACTER_POOL[(roster ?? DEFAULT_ROSTER)[color] ?? 0];
 
+export type PieceArtwork =
+  | { festivalTile: string; art?: never }
+  | { festivalTile?: never; art: number | { uri: string } };
+
+export function pieceArtFor(color: number, roster?: number[], customPhotos?: (string | null)[], festivalTiles?: readonly string[]): PieceArtwork {
+  const festivalTile = festivalTiles?.[color];
+  return festivalTile ? { festivalTile } : { art: artFor(color, roster, customPhotos) };
+}
+
 export const CHARACTER_NAMES = [
   "Cheeky Chintu", "Ninja Ravi", "Pinky Pigtails", "Mighty Bholu", "Little Monk Tenzin", "Leo the Cub",
   "Whiskers", "Captain Zip", "Dash the Duck", "Squeaky", "Scout Arjun", "Prince Ribbit",

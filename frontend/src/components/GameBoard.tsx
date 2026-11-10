@@ -5,7 +5,7 @@ import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-
 
 import { Board, Pos, SIZE } from "@/src/game/engine";
 import { PieceView } from "@/src/components/PieceView";
-import { artFor } from "@/src/game/art";
+import { pieceArtFor } from "@/src/game/art";
 import { fonts, radius, useTheme } from "@/src/theme";
 import { playSfx } from "@/src/game/sound";
 import type { FestivalEffectType } from "@/src/game/festivals";
@@ -102,8 +102,7 @@ export function GameBoard({ board, cell, cellHeight = cell, dying, spawnFrom, se
             dying={dying.has(p.id)}
             selected={!!selected && selected.r === r && selected.c === c}
             hint={!!hint && hint.some((h) => h.r === r && h.c === c)}
-            art={artFor(p.color, roster, customPhotos)}
-            festivalTile={festivalTiles?.[p.color]}
+            {...pieceArtFor(p.color, roster, customPhotos, festivalTiles)}
             festivalEffect={festivalEffects?.[p.color]}
             cheerTick={cheer && cheer.color === p.color && p.special !== "rainbow" ? cheer.tick : undefined}
           />,

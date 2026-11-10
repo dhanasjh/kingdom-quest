@@ -6,12 +6,13 @@ import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-
 
 import { Image } from "expo-image";
 
+import type { PieceArtwork } from "@/src/game/art";
 import type { Piece } from "@/src/game/engine";
 import { PIECES, RAINBOW, SPECIAL_ICON } from "@/src/game/pieces";
 import { useTheme } from "@/src/theme";
 import type { FestivalEffectType } from "@/src/game/festivals";
 
-type Props = { piece: Piece; row: number; col: number; fromRow?: number; cell: number; cellHeight?: number; dying: boolean; selected: boolean; hint?: boolean; art: number | { uri: string }; festivalTile?: string; festivalEffect?: FestivalEffectType; cheerTick?: number };
+type Props = { piece: Piece; row: number; col: number; fromRow?: number; cell: number; cellHeight?: number; dying: boolean; selected: boolean; hint?: boolean; festivalEffect?: FestivalEffectType; cheerTick?: number } & PieceArtwork;
 
 function PieceViewInner({ piece, row, col, fromRow, cell, cellHeight = cell, dying, selected, hint, art, festivalTile, festivalEffect, cheerTick }: Props) {
   const { colors } = useTheme();
@@ -53,7 +54,7 @@ function PieceViewInner({ piece, row, col, fromRow, cell, cellHeight = cell, dyi
   const grad: [string, string, ...string[]] = isRainbow ? [...RAINBOW] : [style.from, style.to];
   const pad = 0;
   const size = cell;
-  const customPhoto = typeof art !== "number";
+  const customPhoto = typeof art === "object";
   // Let bundled character art use the full tile canvas. Keep extra breathing
   // room around user photos so faces stay comfortably inside the frame.
   const imageSize = size * (customPhoto ? 0.9 : 1);
@@ -75,7 +76,7 @@ function PieceViewInner({ piece, row, col, fromRow, cell, cellHeight = cell, dyi
           },
         ]}
       >
-        {festivalTile ? (
+        {festivalTile !== undefined ? (
           <Text style={[styles.festivalTile, { fontSize: size * 0.72 }]}>{festivalTile}</Text>
         ) : isRainbow ? (
           <MaterialDesignIcons name="creation" size={size * 0.62} color={colors.onSurfaceInverse} />

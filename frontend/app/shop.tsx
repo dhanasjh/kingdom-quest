@@ -17,7 +17,8 @@ import { chapterOf } from "@/src/game/levels";
 import { todayKey, useProgress } from "@/src/game/progress";
 import { playSfx } from "@/src/game/sound";
 import { fonts, lifted, makeStyles, radius, spacing, useTheme } from "@/src/theme";
-import { FESTIVAL_PACKS, FestivalId } from "@/src/game/festivals";
+import { diwaliEventActive, FESTIVAL_PACKS, festivalPack, NORMAL_TILE_MODE } from "@/src/game/festivals";
+import type { FestivalPack } from "@/src/game/festivals";
 import { useRewardedAd } from "@/src/ads/RewardedAd";
 import { CUSTOM_MUSIC_UNLOCK_COST, MUSIC_PACKS, SOUND_PACKS } from "@/src/game/musicPacks";
 
@@ -78,14 +79,21 @@ export default function ShopScreen() {
     setToast(`+1 ${BOOSTER_INFO[k].name}`);
   };
 
-  const buyFestivalPack = (id: FestivalId, cost: number) => {
-    if (prog.unlockedFestivals.includes(id)) {
-      prog.update({ activeFestival: prog.activeFestival === id ? null : id });
-      setToast(prog.activeFestival === id ? "Default tiles restored" : "Festival tiles equipped");
+  const chooseFestivalPack = (pack: FestivalPack) => {
+    if (prog.activeFestival === pack.id) {
+      prog.update({ activeFestival: NORMAL_TILE_MODE });
+      setToast("Normal tiles restored");
       return;
     }
-    if (!prog.spendCoins(cost)) { setToast("Not enough coins for this festival pack"); return; }
-    prog.update({ unlockedFestivals: [...prog.unlockedFestivals, id], activeFestival: id });
+    if (prog.unlockedFestivals.includes(pack.id)) {
+      prog.update({ activeFestival: pack.id });
+      setToast("Festival tiles equipped");
+      return;
+    }
+    if (!prog.unlockFestivalPack(pack)) {
+      setToast("Not enough coins for this festival pack");
+      return;
+    }
     playSfx("jackpot");
     setToast("Festival pack unlocked and equipped!");
   };
@@ -185,6 +193,8 @@ export default function ShopScreen() {
   const today = todayKey();
   const streakRewardReady = prog.streak >= 3 && prog.lastPlayDay === today && prog.streakRewardDay !== today;
   const streakRewardClaimed = prog.streakRewardDay === today;
+  const showDiwaliControl = diwaliEventActive() && !festivalPack(prog.activeFestival);
+  const normalTilesSelected = prog.activeFestival === NORMAL_TILE_MODE;
 
   return (
     <View style={styles.root}>
@@ -243,13 +253,36 @@ export default function ShopScreen() {
         })}
         <Text style={styles.section}>Festival Tile Packs</Text>
         <Text style={styles.desc}>Unlock each celebration with coins, then equip it whenever you like.</Text>
+        {showDiwaliControl ? (
+          <GlassPanel blur={false} strong style={styles.earnCard} testID="automatic-diwali-card">
+            <Text style={styles.title}>Automatic Diwali tiles</Text>
+            <Text style={styles.desc}>{normalTilesSelected ? "Normal tiles are selected." : "Diwali tiles are active for the event."}</Text>
+            <ChunkyButton
+              testID="automatic-diwali-action"
+              label={normalTilesSelected ? "Use Diwali tiles" : "Use normal tiles"}
+              variant="plain"
+              disabled={!prog.ready}
+              onPress={() => prog.update({ activeFestival: normalTilesSelected ? null : NORMAL_TILE_MODE })}
+            />
+          </GlassPanel>
+        ) : null}
         {FESTIVAL_PACKS.map((pack) => {
           const unlocked = prog.unlockedFestivals.includes(pack.id);
           const active = prog.activeFestival === pack.id;
           return <GlassPanel key={pack.id} blur={false} strong style={styles.festivalCard} testID={`festival-pack-${pack.id}`}>
             <Text style={styles.festivalPreview}>{pack.tiles.slice(0, 4).join("  ")}</Text>
-            <View style={{ flex: 1 }}><Text style={styles.title}>{pack.title}</Text><Text style={styles.desc}>{pack.cost} coins · {unlocked ? active ? "Equipped" : "Unlocked" : "One-time unlock"}</Text></View>
-            <ChunkyButton label={active ? "Equipped" : unlocked ? "Equip" : `${pack.cost}`} variant={active ? "plain" : "secondary"} icon={unlocked && !active ? "check" : undefined} onPress={() => buyFestivalPack(pack.id, pack.cost)} disabled={!unlocked && prog.coins < pack.cost} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.title}>{pack.title}</Text>
+              <Text style={styles.desc}>{active ? "Equipped" : unlocked ? "Unlocked" : `${pack.cost} coins · One-time unlock`}</Text>
+            </View>
+            <ChunkyButton
+              testID={`festival-action-${pack.id}`}
+              label={active ? "Unequip" : unlocked ? "Equip" : "Buy"}
+              variant={active ? "plain" : "secondary"}
+              size="sm"
+              disabled={!prog.ready || (!active && !unlocked && prog.coins < pack.cost)}
+              onPress={() => chooseFestivalPack(pack)}
+            />
           </GlassPanel>;
         })}
         <Text style={styles.section}>Music & Match Sounds</Text>

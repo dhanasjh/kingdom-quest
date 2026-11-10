@@ -26,19 +26,22 @@ export function FestivalBanner({ onPress }: { onPress: () => void }) {
   );
 }
 
-export function MakeItYoursBanner({ onPress }: { onPress: () => void }) {
+export function MakeItYoursBanner({ hasPhotos, onPress }: { hasPhotos: boolean; onPress: () => void }) {
   const styles = useStyles();
   const { colors } = useTheme();
+  const action = hasPhotos ? "Manage photos" : "Add your photos";
   return (
-    <Pressable testID="make-it-yours-banner" onPress={() => { playSfx("tap"); onPress(); }} accessibilityRole="button" accessibilityLabel="Add family, friends, pets, or your own character photos">
-      <GlassPanel blur={false} strong style={[styles.banner, { borderColor: colors.brandPrimary }]}>
-        <View style={[styles.icon, { backgroundColor: colors.brandPrimary }]}><MaterialDesignIcons name="account-heart" size={25} color={colors.onBrandPrimary} /></View>
-        <View style={{ flex: 1, gap: 3 }}>
-          <Text style={styles.title}>Make your quest yours</Text>
-          <Text style={styles.body}>Add family, friends, pets, or your own photo as puzzle characters. Photos stay on this device.</Text>
-          <Text style={[styles.emojis, { color: colors.brand }]}>👨‍👩‍👧  🐾  📸  Tap to customize</Text>
+    <Pressable testID="make-it-yours-banner" onPress={() => { playSfx("tap"); onPress(); }} accessibilityRole="button" accessibilityLabel={action} accessibilityHint="Turn personal photos into puzzle pieces">
+      <GlassPanel blur={false} strong style={[styles.banner, styles.photoBanner]}>
+        <View style={[styles.icon, { backgroundColor: colors.brandPrimary }]}><MaterialDesignIcons name="image-multiple" size={28} color={colors.onSurface} /></View>
+        <View style={{ flex: 1, gap: spacing.xs }}>
+          <Text style={styles.title}>Play with your photos</Text>
+          <Text style={styles.body}>Turn pictures of family, friends, or pets into puzzle pieces.</Text>
+          <View style={styles.photoCta}>
+            <Text style={styles.photoCtaText}>{action}</Text>
+            <MaterialDesignIcons name="chevron-right" size={20} color={colors.onBrandSecondary} />
+          </View>
         </View>
-        <MaterialDesignIcons name="chevron-right" size={28} color={colors.brandPrimary} />
       </GlassPanel>
     </Pressable>
   );
@@ -50,4 +53,7 @@ const useStyles = makeStyles((c) => ({
   title: { fontFamily: fonts.display, fontSize: 17, color: c.onSurface },
   body: { fontFamily: fonts.text, fontSize: 12, lineHeight: 16, color: c.onSurfaceTertiary },
   emojis: { fontFamily: fonts.textBold, fontSize: 13, color: c.onSurfaceTertiary },
+  photoBanner: { borderColor: c.brandPrimary, borderWidth: 2 },
+  photoCta: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: spacing.xs, borderRadius: 12, backgroundColor: c.brandSecondary, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  photoCtaText: { flexShrink: 1, fontFamily: fonts.textBold, fontSize: 14, color: c.onBrandSecondary },
 }));

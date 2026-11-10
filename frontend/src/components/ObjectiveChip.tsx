@@ -3,7 +3,7 @@ import { Text, View } from "react-native";
 import { Image } from "expo-image";
 import { MaterialDesignIcons } from "@react-native-vector-icons/material-design-icons";
 
-import { artFor } from "@/src/game/art";
+import { pieceArtFor } from "@/src/game/art";
 import type { FestivalPack } from "@/src/game/festivals";
 import type { Objective } from "@/src/game/levels";
 import { OBJECTIVE_ICON, PIECES } from "@/src/game/pieces";
@@ -24,15 +24,15 @@ export function ObjectiveChip({ obj, remaining, testID, roster, customPhotos, fe
   const done = remaining <= 0;
   const color = obj.color ?? 0;
   const piece = obj.type === "color" ? PIECES[color] : null;
-  const festivalTile = festivalTiles?.[color];
+  const target = piece && { backgroundColor: piece.from, ...pieceArtFor(color, roster, customPhotos, festivalTiles) };
   return (
     <View style={styles.chip}>
-      {piece ? (
-        <View style={[styles.icon, { backgroundColor: piece.from, overflow: "hidden" }]}>
-          {festivalTile ? (
-            <Text style={styles.festivalTile}>{festivalTile}</Text>
+      {target ? (
+        <View style={[styles.icon, { backgroundColor: target.backgroundColor, overflow: "hidden" }]}>
+          {target.festivalTile !== undefined ? (
+            <Text style={styles.festivalTile}>{target.festivalTile}</Text>
           ) : (
-            <Image source={artFor(color, roster, customPhotos)} style={{ width: 23, height: 23 }} contentFit="cover" />
+            <Image source={target.art} style={{ width: 23, height: 23 }} contentFit="cover" />
           )}
         </View>
       ) : (

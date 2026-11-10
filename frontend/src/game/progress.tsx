@@ -4,6 +4,7 @@ import * as Haptics from "expo-haptics";
 import { storage } from "@/src/utils/storage";
 import { setMusicEnabled, setMusicTrack, setSfxEnabled, startMusic } from "@/src/game/sound";
 import { chapterFirstLevel, chapterOf } from "@/src/game/levels";
+import type { FestivalPack } from "@/src/game/festivals";
 
 export const MAX_LIVES = 5;
 export const LIFE_MS = 20 * 60 * 1000;
@@ -104,6 +105,7 @@ type Ctx = Saved & {
   setMusicTrackNumber: (v: number) => void;
   grant: (g: Grant) => void;
   spendCoins: (n: number) => boolean;
+  unlockFestivalPack: (pack: FestivalPack) => boolean;
   consumeBooster: (k: "hammer" | "shuffle" | "snake") => boolean;
   claimStreakBonus: () => boolean;
   reset: () => void;
@@ -182,6 +184,22 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, coins: s.coins - n }));
     return true;
   }, []);
+
+  const unlockFestivalPack = useCallback(({ id, cost }: FestivalPack) => {
+    const current = stateRef.current;
+    if (!ready) return false;
+    if (current.unlockedFestivals.includes(id)) return true;
+    if (current.coins < cost) return false;
+    const unlock = (s: Saved): Saved => ({
+      ...s,
+      coins: s.coins - cost,
+      unlockedFestivals: [...s.unlockedFestivals, id],
+      activeFestival: id,
+    });
+    stateRef.current = unlock(current);
+    setState(unlock);
+    return true;
+  }, [ready]);
 
   const consumeBooster = useCallback((k: "hammer" | "shuffle" | "snake") => {
     const field = k === "hammer" ? "hammers" : k === "shuffle" ? "shuffles" : "snakes";
@@ -287,12 +305,13 @@ export function ProgressProvider({ children }: { children: React.ReactNode }) {
       setMusicTrackNumber: (v) => setState((s) => ({ ...s, musicTrack: Math.max(0, Math.min(4, Math.floor(v))), customMusicUri: null, customMusicName: "" })),
       grant,
       spendCoins,
+      unlockFestivalPack,
       consumeBooster,
       claimStreakBonus,
       reset: () => setState({ ...initial(), characterPhotos: stateRef.current.characterPhotos }),
       haptic,
     }),
-    [state, ready, now, completeLevel, loseLife, restore, haptic, grant, spendCoins, consumeBooster, claimStreakBonus],
+    [state, ready, now, completeLevel, loseLife, restore, haptic, grant, spendCoins, unlockFestivalPack, consumeBooster, claimStreakBonus],
   );
 
   return <ProgressContext.Provider value={value}>{children}</ProgressContext.Provider>;
